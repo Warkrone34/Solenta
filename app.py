@@ -9,6 +9,7 @@ from audio_engine import analyze_audio_determinants
 from color_engine import analyze_color_context
 from nst_engine import synthesize_nst_art, apply_adaptive_histogram_bending
 from filter_engine import apply_timbre_driven_convolution, apply_kmeans_color_quantization 
+from senta_logger import log_training_data
 from data_manager import (
     get_all_artists,
     get_artworks_by_artist,
@@ -113,7 +114,6 @@ def process_primary_generation(audio_upload, audio_preset, start_time_sec, synth
         style_img = recolor_image_to_music_hue(raw_img, hue_val)
         structural_canvas = generate_acoustic_voronoi_canvas(bpm, timbre, hue_val, loudness)
 
-        # [GÜNCELLENDİ]: Gestalt toleransı en yüksek nesneler
         concept_map = {
             "Yok (Saf Soyut)": None, 
             "İnsan Yüzü": "A dramatic close-up of a human face", 
@@ -156,6 +156,8 @@ def process_primary_generation(audio_upload, audio_preset, start_time_sec, synth
         
         full_log = base_log + f"\n⚙️ 3. MATEMATİKSEL MODİFİKASYON (ALGORİTMA RAPORU)\n ├─ {hist_log}\n ├─ {spatial_log}\n └─ {kmeans_log}"
 
+        log_training_data(final_image, state_data, target_concept_tr, intensity_slider, spatial_slider, kmeans_slider)
+
         choices = [item[1] for item in top_3]
         return final_image, full_log, gr.update(choices=choices, value=choices[0], visible=True), gr.update(visible=True), state_data
 
@@ -178,7 +180,6 @@ def process_alternative_generation(state_data, selected_brush, synthesis_mode, t
         
         style_name = selected_brush.split(": ")[-1]
         
-        # [GÜNCELLENDİ]: Gestalt toleransı en yüksek nesneler
         concept_map = {
             "Yok (Saf Soyut)": None, 
             "İnsan Yüzü": "A dramatic close-up of a human face", 
@@ -215,6 +216,8 @@ def process_alternative_generation(state_data, selected_brush, synthesis_mode, t
         
         full_log = base_log + f"\n⚙️ 3. MATEMATİKSEL MODİFİKASYON (ALGORİTMA RAPORU)\n ├─ {hist_log}\n ├─ {spatial_log}\n └─ {kmeans_log}"
         
+        log_training_data(final_image, state_data, target_concept_tr, intensity_slider, spatial_slider, kmeans_slider)
+
         return final_image, full_log, state_data
     except Exception as e:
         return None, f"SENTEZ HATASI: {str(e)}", state_data
@@ -307,6 +310,18 @@ def process_image_to_image(content_image, is_auto, artist, artwork, top_10_state
     except Exception as e:
         return None, f"HATA: {str(e)}"
 
+# --- YENİ UX DENEYİMİ: DİNAMİK MÜZİK GİRDİSİ ---
+def handle_preset_selection(preset_name):
+    # Hazır şarkı seçildiyse: Kullanıcının yüklediği dosyayı sil, saniye kutusunu Kapat ve 0'a sabitle.
+    if preset_name:
+        return None, gr.update(visible=False, value=0)
+    return gr.update(), gr.update(visible=True)
+
+def handle_user_upload(file_path):
+    # Kullanıcı dosya yüklediyse: Hazır şarkı seçimini sil, saniye kutusunu Aç.
+    if file_path:
+        return None, gr.update(visible=True)
+    return gr.update(), gr.update(visible=True)
 
 # --- 4. CSS VE ARAYÜZ ---
 custom_css = """
@@ -334,7 +349,6 @@ with gr.Blocks(css=custom_css, title="SENTA Laboratuvarı") as senta_app:
                     gr.Markdown("### İŞİTSEL GİRDİ")
                     audio_mode_radio = gr.Radio(choices=["⚡ Light Mod (NST)", "🚀 Pro Mod (LCM Turbo)"], value="⚡ Light Mod (NST)", label="Motor Seçimi", elem_classes="radio-group")
                     
-                    # [GÜNCELLENDİ]: Sadece Organik ve Tutarlı Nesneler
                     target_concept_dropdown = gr.Dropdown(
                         choices=["Yok (Saf Soyut)", "İnsan Yüzü", "Göz", "Kedi", "Uçan Kuş", "Yaşlı Ağaç", "Çiçek (Lotus)"],
                         value="Yok (Saf Soyut)",
@@ -342,9 +356,11 @@ with gr.Blocks(css=custom_css, title="SENTA Laboratuvarı") as senta_app:
                         visible=False
                     )
                     
-                    audio_input = gr.Audio(type="filepath", label="Müzik Yükle (Sadece Dosya)")
-                    preset_audio = gr.Dropdown(choices=get_preset_audio_list(), label="Veya Hazır Müzik Seç") 
-                    start_time_input = gr.Number(value=0, label="Hangi Saniyeden Başlasın? (Örn: 45)", precision=0)
+                    audio_input = gr.Audio(type="filepath", label="Müzik Yükle (Kendi Dosyan)")
+                    preset_audio = gr.Dropdown(choices=get_preset_audio_list(), label="Veya Hazır Müzik Seç (Otomatik Kırpılmış)") 
+                    
+                    # [UX GÜNCELLEMESİ]: Bu kutu artık dinamik olarak kaybolup belirecek
+                    start_time_input = gr.Number(value=0, label="Hangi Saniyeden Başlasın? (Sadece Yüklenen Dosyalar İçin)", precision=0)
                     
                     with gr.Group():
                         gr.Markdown("#### 🧮 Sinyal-Piksel Bükücü Algoritmalar")
@@ -364,17 +380,24 @@ with gr.Blocks(css=custom_css, title="SENTA Laboratuvarı") as senta_app:
                         gr.Markdown("#### 🎨 Çıkan Dokuyu Beğenmedin mi?")
                         brush_options = gr.Dropdown(label="Müziğine uygun diğer 2 dokudan birini seç:", choices=[], interactive=True)
                         
+            # --- YENİ UX ETKİLEŞİMLERİ ---
+            preset_audio.change(
+                fn=handle_preset_selection, 
+                inputs=[preset_audio], 
+                outputs=[audio_input, start_time_input]
+            )
+            
+            audio_input.change(
+                fn=handle_user_upload, 
+                inputs=[audio_input], 
+                outputs=[preset_audio, start_time_input]
+            )
+            # -----------------------------
+
             audio_mode_radio.change(
                 fn=lambda mode: gr.update(visible="Pro" in mode),
                 inputs=[audio_mode_radio],
                 outputs=[target_concept_dropdown],
-                show_progress="hidden"
-            )
-
-            preset_audio.change(
-                fn=lambda x: x, 
-                inputs=preset_audio, 
-                outputs=audio_input,
                 show_progress="hidden"
             )
             
