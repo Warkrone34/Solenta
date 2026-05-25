@@ -92,7 +92,8 @@ def calculate_image_timbre_surrogate(img_matrix):
     visual_timbre = np.mean(magnitude_spectrum) * 100 
     return visual_timbre
 
-def get_ranked_top_10_artworks(content_image, akim_karari):
+# [GÜNCELLENDİ]: Dinamik Havuz ve Top-K Parametreleri
+def get_ranked_top_10_artworks(content_image, akim_karari, max_scan=2127, top_k=10):
     global _FEATURES_CACHE
     category_folder = CATEGORIES.get(akim_karari, "proto")
     target_path = os.path.join(DATASET_PATH, category_folder)
@@ -105,7 +106,8 @@ def get_ranked_top_10_artworks(content_image, akim_karari):
     seed = abs(hash(akim_karari)) % (2**32 - 1)
     rng = np.random.default_rng(seed)
     
-    pool_size = min(500, len(images)) 
+    # Kullanıcının belirlediği havuza göre tarama yapar
+    pool_size = min(max_scan, len(images)) 
     candidate_images = rng.choice(images, pool_size, replace=False).tolist() if len(images) > pool_size else images
 
     user_lum, user_edge = calculate_image_features(content_image)
@@ -134,21 +136,18 @@ def get_ranked_top_10_artworks(content_image, akim_karari):
         edge_diff = abs(user_edge - style_edge)
         scores.append((lum_diff + edge_diff, img_path, img_name))
         
-    print("\n[SENTA SİSTEMİ]: Tarama Tamamlandı. En iyi 10 eser UI'a aktarılıyor.")
+    print(f"\n[SENTA SİSTEMİ]: Tarama Tamamlandı. En iyi {top_k} eser UI'a aktarılıyor.")
     scores.sort(key=lambda x: x[0])
     
     results = []
-    for rank, (score, path, img_name) in enumerate(scores[:10], start=1):
+    # Dinamik Top-K
+    for rank, (score, path, img_name) in enumerate(scores[:int(top_k)], start=1):
         clean_name = os.path.splitext(img_name)[0].replace('_', ' ').replace('-', ' ').title()
         display_name = f"{rank}. Eşleşme: {clean_name}"
         results.append((path, display_name))
     return results
 
 def recolor_image_to_music_hue(img_matrix, target_hue_deg):
-    """
-    Sanat eserinin dokusunu koruyarak tüm renklerini 
-    müzikten gelen Perde (Hue) değerine göre boyar.
-    """
     if img_matrix is None: return np.ones((512, 512, 3), dtype=np.uint8) * 128
     hsv_image = cv2.cvtColor(img_matrix, cv2.COLOR_RGB2HSV).astype(np.float32)
     opencv_hue = int(target_hue_deg / 2.0) % 180

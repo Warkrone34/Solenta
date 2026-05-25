@@ -5,7 +5,7 @@ import cv2
 
 from scipy.spatial import Voronoi
 
-from audio_engine import analyze_audio_determinants
+from audio_engine import analyze_audio_determinants, find_optimal_audio_segment
 from color_engine import analyze_color_context
 from nst_engine import synthesize_nst_art, apply_adaptive_histogram_bending
 from filter_engine import apply_timbre_driven_convolution, apply_kmeans_color_quantization 
@@ -27,8 +27,33 @@ try:
 except ImportError:
     synthesize_fusion_art = None
 
+# 1080p SUPER RESOLUTION (KALİTE ZORLAYICI)
+def enforce_1080p_quality(image_matrix):
+    if image_matrix is None: return None
+    h, w = image_matrix.shape[:2]
+    
+    # Hedef standardımız: Kısa veya uzun kenar fark etmeksizin yüksekliği 1080'e sabitlemek
+    target_h = 1080
+    
+    # Eğer zaten 1080p veya daha büyükse yorma, geri yolla
+    if h >= target_h:
+        return image_matrix
+        
+    # Orijinal resmin en/boy oranını (aspect ratio) bozmadan genişliği hesapla
+    ratio = target_h / float(h)
+    target_w = int(w * ratio)
+    
+    # 1. Aşama: Lanczos-4 Algoritması (Piksel bozulmalarını sıfıra indiren en kaliteli büyütme yöntemi)
+    upscaled = cv2.resize(image_matrix, (target_w, target_h), interpolation=cv2.INTER_LANCZOS4)
+    
+    # 2. Aşama: Unsharp Mask (Büyütmeden kaynaklı mikro bulanıklığı bıçak gibi keskinleştirme)
+    blur = cv2.GaussianBlur(upscaled, (0, 0), 2.0)
+    crisp_1080p = cv2.addWeighted(upscaled, 1.25, blur, -0.25, 0)
+    
+    return crisp_1080p
 
-# --- 1. AŞAMA: BİLGİSAYAR BİLİMLERİ (AKUSTİK VORONOI İSKELETİ) ---
+
+# 1. AŞAMA: BİLGİSAYAR BİLİMLERİ (AKUSTİK VORONOI İSKELETİ)
 def generate_acoustic_voronoi_canvas(bpm, timbre, hue_val, loudness):
     width, height = 512, 512
     canvas = np.ones((height, width, 3), dtype=np.uint8) * 20
@@ -71,8 +96,7 @@ def generate_acoustic_voronoi_canvas(bpm, timbre, hue_val, loudness):
 
     return canvas
 
-
-# --- 2. İŞLEM FONKSİYONLARI (MÜZİK) ---
+# 2. İŞLEM FONKSİYONLARI (MÜZİK)
 def generate_detailed_log(bpm, timbre, hue_val, loudness, akim_karari, style_name, engine_used, status, target_concept_tr, is_pro):
     log_text = f"███ SENTA ÜRETİM SÜRECİ ANALİZİ ███\n\n"
     log_text += f"🎵 1. İŞİTSEL-GÖRSEL HARİTALAMA (DETERMİNANTLAR)\n"
@@ -84,6 +108,7 @@ def generate_detailed_log(bpm, timbre, hue_val, loudness, akim_karari, style_nam
     log_text += f"🎨 2. TOPOLOJİK SENTEZ\n"
     log_text += f" ├─ İskelet Algoritması: Akustik Voronoi Şeması (O(n log n))\n"
     log_text += f" ├─ Odak Nesnesi: {target_concept_tr if (is_pro and target_concept_tr != 'Yok (Saf Soyut)') else 'Saf Soyut (Sadece Vektörler)'}\n"
+    log_text += f" ├─ Çıktı Çözünürlüğü: 1080p (Super Resolution ile Optimize Edildi)\n"
     log_text += f" ├─ Motor: {engine_used}\n"
     log_text += f" └─ Sistem Durumu: {status}\n"
         
@@ -136,27 +161,35 @@ def process_primary_generation(audio_upload, audio_preset, start_time_sec, synth
             if synthesize_fusion_art is None: return None, "[SİSTEM HATASI] Pro Mod kütüphaneleri eksik.", gr.update(), gr.update(), None
             final_image, status = synthesize_fusion_art(structural_canvas, style_img, is_music_mode=True, target_concept=target_en, style_name=style_name, loudness=loudness, intensity_slider=intensity_slider)
             
-            state_data["pro_base_output"] = final_image.copy() 
+            state_data["pro_base_output"] = final_image.copy() if final_image is not None else None
             state_data["raw_light_output"] = None
             engine_used = "LCM Turbo + MiDaS Depth"
             hist_log = status.split("\n")[-1] if "\n" in status else ""
             status = status.split("\n")[0]
         else:
-            raw_final_image, status = synthesize_nst_art(structural_canvas, style_img)
-            state_data["raw_light_output"] = raw_final_image.copy() 
+            raw_final_image, status = synthesize_nst_art(structural_canvas, style_img, style_weight=1.0)
+            
+            state_data["raw_light_output"] = raw_final_image.copy() if raw_final_image is not None else None
             state_data["pro_base_output"] = None
             engine_used = "Neural Style Transfer"
             final_image, hist_log = apply_adaptive_histogram_bending(raw_final_image, loudness, intensity_slider)
 
-        final_image, spatial_log = apply_timbre_driven_convolution(final_image, timbre, spatial_slider)
-        final_image, kmeans_log = apply_kmeans_color_quantization(final_image, kmeans_slider)
+        if final_image is not None:
+            final_image, spatial_log = apply_timbre_driven_convolution(final_image, timbre, spatial_slider)
+            final_image, kmeans_log = apply_kmeans_color_quantization(final_image, kmeans_slider)
+            
+            # Üretilen resim zorla 1080p'ye büyütülür
+            final_image = enforce_1080p_quality(final_image)
+            
+            log_training_data(final_image, state_data, target_concept_tr, intensity_slider, spatial_slider, kmeans_slider)
+        else:
+            spatial_log = "Konvolüsyon Pas Geçildi."
+            kmeans_log = "K-Means Pas Geçildi."
 
         base_log = generate_detailed_log(bpm, timbre, hue_val, loudness, akim_karari, style_name, engine_used, status, target_concept_tr, is_pro)
         state_data["base_log"] = base_log 
         
         full_log = base_log + f"\n⚙️ 3. MATEMATİKSEL MODİFİKASYON (ALGORİTMA RAPORU)\n ├─ {hist_log}\n ├─ {spatial_log}\n └─ {kmeans_log}"
-
-        log_training_data(final_image, state_data, target_concept_tr, intensity_slider, spatial_slider, kmeans_slider)
 
         choices = [item[1] for item in top_3]
         return final_image, full_log, gr.update(choices=choices, value=choices[0], visible=True), gr.update(visible=True), state_data
@@ -196,28 +229,36 @@ def process_alternative_generation(state_data, selected_brush, synthesis_mode, t
             target_en = concept_map.get(target_concept_tr, None)
             final_image, status = synthesize_fusion_art(structural_canvas, style_img, is_music_mode=True, target_concept=target_en, style_name=style_name, loudness=loudness, intensity_slider=intensity_slider)
             
-            state_data["pro_base_output"] = final_image.copy()
+            state_data["pro_base_output"] = final_image.copy() if final_image is not None else None
             state_data["raw_light_output"] = None
             engine_used = "LCM Turbo + MiDaS Depth"
             hist_log = status.split("\n")[-1] if "\n" in status else ""
             status = status.split("\n")[0]
         else:
-            raw_final_image, status = synthesize_nst_art(structural_canvas, style_img)
-            state_data["raw_light_output"] = raw_final_image.copy()
+            raw_final_image, status = synthesize_nst_art(structural_canvas, style_img, style_weight=1.0)
+            
+            state_data["raw_light_output"] = raw_final_image.copy() if raw_final_image is not None else None
             state_data["pro_base_output"] = None
             engine_used = "Neural Style Transfer"
             final_image, hist_log = apply_adaptive_histogram_bending(raw_final_image, loudness, intensity_slider)
 
-        final_image, spatial_log = apply_timbre_driven_convolution(final_image, timbre, spatial_slider)
-        final_image, kmeans_log = apply_kmeans_color_quantization(final_image, kmeans_slider)
+        if final_image is not None:
+            final_image, spatial_log = apply_timbre_driven_convolution(final_image, timbre, spatial_slider)
+            final_image, kmeans_log = apply_kmeans_color_quantization(final_image, kmeans_slider)
+            
+            # 1080p SUPER RESOLUTION (KALİTE ZORLAYICI)
+            final_image = enforce_1080p_quality(final_image)
+            
+            log_training_data(final_image, state_data, target_concept_tr, intensity_slider, spatial_slider, kmeans_slider)
+        else:
+            spatial_log = "Konvolüsyon Pas Geçildi."
+            kmeans_log = "K-Means Pas Geçildi."
 
         base_log = generate_detailed_log(bpm, timbre, hue_val, loudness, akim_karari, style_name, engine_used, status, target_concept_tr, is_pro)
         state_data["base_log"] = base_log 
         
         full_log = base_log + f"\n⚙️ 3. MATEMATİKSEL MODİFİKASYON (ALGORİTMA RAPORU)\n ├─ {hist_log}\n ├─ {spatial_log}\n └─ {kmeans_log}"
         
-        log_training_data(final_image, state_data, target_concept_tr, intensity_slider, spatial_slider, kmeans_slider)
-
         return final_image, full_log, state_data
     except Exception as e:
         return None, f"SENTEZ HATASI: {str(e)}", state_data
@@ -241,21 +282,25 @@ def apply_all_post_processing(state_data, intensity_slider, spatial_slider, kmea
     final_image, kmeans_log = apply_kmeans_color_quantization(img_conv, kmeans_slider)
     log_additions.append(kmeans_log)
     
+    # 1080p SUPER RESOLUTION (KALİTE ZORLAYICI)
+    final_image = enforce_1080p_quality(final_image)
+    
     new_log_text = "\n ├─ ".join(log_additions)
     final_log = state_data["base_log"] + f"\n⚙️ 3. MATEMATİKSEL MODİFİKASYON (CANLI)\n ├─ {new_log_text}"
     
     return final_image, gr.update(value=final_log)
 
 
-# --- 3. GÖRSEL SEKME UX KONTROLLERİ ---
-def initialize_auto_scan(content_img):
+# 3. GÖRSEL SEKME UX KONTROLLERİ VE CANLI FİLTRELER
+def initialize_auto_scan(content_img, max_scan, top_k):
     if content_img is None: return gr.update(value=[]), [], "Lütfen önce fotoğraf yükleyin."
     zemin_rengi, _, _ = analyze_color_context(content_img)
     if zemin_rengi in ["Kırmızı", "Turuncu", "Sarı"]: akim = "Sentetik Kübizm (Geniş Renk Yüzeyleri)"
     elif zemin_rengi in ["Mavi", "Mor", "Yeşil"]: akim = "Analitik Kübizm (Yüksek Form Dominansı)"
     else: akim = "Proto-Kübizm (Sadeleştirilmiş Doğrusal İndeks)"
-    top_10 = get_ranked_top_10_artworks(content_img, akim)
-    return gr.update(value=top_10), top_10, "AI taraması tamamlandı! Lütfen listeden bir eser seçiniz."
+    
+    top_results = get_ranked_top_10_artworks(content_image=content_img, akim_karari=akim, max_scan=max_scan, top_k=top_k)
+    return gr.update(value=top_results), top_results, f"AI taraması tamamlandı! {max_scan} eser arasından en uyumlu {top_k} eser bulundu."
 
 def toggle_auto_mode(is_auto):
     if is_auto: return gr.update(visible=False), gr.update(visible=True)
@@ -264,66 +309,88 @@ def toggle_auto_mode(is_auto):
 def save_gallery_selection(evt: gr.SelectData):
     return evt.index, gr.update(interactive=True)
 
-def process_image_to_image(content_image, is_auto, artist, artwork, top_10_state, selected_idx, synthesis_mode):
+def live_image_post_processing(img_state, sharpness, saturation, contrast):
+    if img_state is None:
+        return gr.update()
+    
+    img = img_state.copy()
+    
+    if saturation != 1.0:
+        hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV).astype(np.float32)
+        hsv[:, :, 1] = np.clip(hsv[:, :, 1] * saturation, 0, 255)
+        img = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2RGB)
+        
+    if sharpness > 0.0:
+        blur = cv2.GaussianBlur(img, (0, 0), 3.0)
+        img = cv2.addWeighted(img, 1.0 + (sharpness / 2.0), blur, -(sharpness / 2.0), 0)
+        
+    if contrast > 1.0:
+        lab = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=contrast, tileGridSize=(8,8))
+        cl = clahe.apply(l)
+        img = cv2.cvtColor(cv2.merge((cl, a, b)), cv2.COLOR_LAB2RGB)
+        
+    return img
+
+def process_image_to_image(content_image, is_auto, artist, artwork, top_10_state, selected_idx, synthesis_mode, style_weight):
     try:
-        if content_image is None: return None, "[HATA]: Fotoğraf yükleyin."
+        if content_image is None: return None, "[HATA]: Fotoğraf yükleyin.", None
         
         user_lum, user_edge = calculate_image_features(content_image)
         zemin_rengi, tamamlayici, etki = analyze_color_context(content_image)
         
         if is_auto:
-            if selected_idx is None: return None, "Eser seçin!"
+            if selected_idx is None: return None, "Eser seçin!", None
             style_img = safe_image_read(top_10_state[selected_idx][0])
             style_name = top_10_state[selected_idx][1]
-            secim_yontemi = "AI Bulanık Mantık Taraması (Top-10)"
+            secim_yontemi = "AI Bulanık Mantık Taraması"
         else:
-            if not artist or not artwork: return None, "Sanatçı ve Eser seçin."
+            if not artist or not artwork: return None, "Sanatçı ve Eser seçin.", None
             style_img = get_artwork_image(artist, artwork)
             style_name = f"{artist} - {artwork}"
             secim_yontemi = "Kullanıcı Manuel Seçimi"
 
         if "Pro" in synthesis_mode:
-            final_image, status = synthesize_fusion_art(content_image, style_img, is_music_mode=False, style_name=style_name)
+            final_image, status = synthesize_fusion_art(content_image, style_img, is_music_mode=False, style_name=style_name, style_weight=style_weight)
             engine_used = "LCM Turbo + MiDaS Depth"
-            fusion_text = "Algısal Harmanlama: Referans sanat eserinin dokusu, yüklenen fotoğrafın MiDaS ile çıkarılan hacim haritasına (Depth Map) işlendi."
+            fusion_text = "Algısal Harmanlama: Referans sanat eserinin dokusu, yüklenen fotoğrafın MiDaS hacim haritasına işlendi."
         else:
-            final_image, status = synthesize_nst_art(content_image, style_img)
-            engine_used = "Neural Style Transfer"
-            fusion_text = "Matris Transferi: Referans sanat eserinin dokusal pikselleri doğrudan içerik matrisinin üzerine Neural Network ile işlendi."
+            final_image, status = synthesize_nst_art(content_image, style_img, style_weight=style_weight)
+            engine_used = "Neural Style Transfer + SENTA İyileştirme"
+            fusion_text = "Matris Transferi ve Otomatik İyileştirme: Yapay Zeka çıktısı LAB Renk Uzayında orijinal renklerle dengelendi."
 
         log_text = f"███ SENTA GÖRSEL SENTEZ RAPORU ███\n\n"
-        log_text += f"🔍 1. GÖRSEL ALGI (ÖZNİTELİK ÇIKARIMI)\n"
-        log_text += f" ├─ Işık Haritası (Luminance): {user_lum:.2f} (Piksel Parlaklık Ortalaması)\n"
-        log_text += f" ├─ Kenar Yoğunluğu (Edges)  : {user_edge:.2f} (Canny Edge Algoritması Puanı)\n"
-        log_text += f" └─ Zemin Rengi Analizi      : {zemin_rengi} ({etki})\n\n"
+        log_text += f"🔍 1. GÖRSEL ALGI\n ├─ Işık (Lum): {user_lum:.2f}\n ├─ Kenar (Edge): {user_edge:.2f}\n └─ Zemin: {zemin_rengi}\n\n"
+        log_text += f"🧠 2. REFERANS\n ├─ Karar: {secim_yontemi}\n └─ Eser: {style_name}\n\n"
+        log_text += f"⚙️ 3. SENTEZ\n ├─ Çıktı Çözünürlüğü: 1080p (Super Resolution ile Optimize Edildi)\n ├─ Motor : {engine_used}\n ├─ Ağırlık: %{int(style_weight * 100)}\n └─ Durum: {status}"
 
-        log_text += f"🧠 2. REFERANS HARİTALAMA\n"
-        log_text += f" ├─ Karar Yöntemi: {secim_yontemi}\n"
-        log_text += f" └─ Referans Eser: {style_name}\n\n"
-
-        log_text += f"⚙️ 3. TOPOLOJİK SENTEZ\n"
-        log_text += f" ├─ Sentez Motoru : {engine_used}\n"
-        log_text += f" ├─ Sentez Tekniği: {fusion_text}\n"
-        log_text += f" └─ Motor Durumu  : {status}"
-
-        return final_image, log_text
+        # [1080P DEVREDE]
+        final_image = enforce_1080p_quality(final_image)
+        
+        final_state = final_image.copy() if final_image is not None else None
+        return final_image, log_text, final_state
+    
     except Exception as e:
-        return None, f"HATA: {str(e)}"
+        return None, f"HATA: {str(e)}", None
 
-# --- YENİ UX DENEYİMİ: DİNAMİK MÜZİK GİRDİSİ ---
+# UX DENEYİMİ: DİNAMİK MÜZİK GİRDİSİ
 def handle_preset_selection(preset_name):
-    # Hazır şarkı seçildiyse: Kullanıcının yüklediği dosyayı sil, saniye kutusunu Kapat ve 0'a sabitle.
     if preset_name:
         return None, gr.update(visible=False, value=0)
     return gr.update(), gr.update(visible=True)
 
+# AKILLI KESİM MOTORUNU KULLANICI UPLOAD ETTİĞİ AN ÇALIŞTIRAN FONKSİYON
 def handle_user_upload(file_path):
-    # Kullanıcı dosya yüklediyse: Hazır şarkı seçimini sil, saniye kutusunu Aç.
     if file_path:
-        return None, gr.update(visible=True)
-    return gr.update(), gr.update(visible=True)
+        # Şarkı yüklendiğinde arka planda en iyi 'Drop' noktasını tespit et
+        optimal_start = find_optimal_audio_segment(file_path)
+        # Hazır listeyi temizle (None) ve tespit edilen saniyeyi arayüze bas
+        return None, gr.update(visible=True, value=optimal_start)
+    
+    return gr.update(), gr.update(visible=True, value=0)
 
-# --- 4. CSS VE ARAYÜZ ---
+# 4. CSS VE ARAYÜZ
 custom_css = """
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
 .gradio-container { font-family: 'Montserrat', sans-serif !important; }
@@ -349,24 +416,18 @@ with gr.Blocks(css=custom_css, title="SENTA Laboratuvarı") as senta_app:
                     gr.Markdown("### İŞİTSEL GİRDİ")
                     audio_mode_radio = gr.Radio(choices=["⚡ Light Mod (NST)", "🚀 Pro Mod (LCM Turbo)"], value="⚡ Light Mod (NST)", label="Motor Seçimi", elem_classes="radio-group")
                     
-                    target_concept_dropdown = gr.Dropdown(
-                        choices=["Yok (Saf Soyut)", "İnsan Yüzü", "Göz", "Kedi", "Uçan Kuş", "Yaşlı Ağaç", "Çiçek (Lotus)"],
-                        value="Yok (Saf Soyut)",
-                        label="Opsiyonel Odak Nesnesi (Focal Point)",
-                        visible=False
-                    )
+                    target_concept_dropdown = gr.Dropdown(choices=["Yok (Saf Soyut)", "İnsan Yüzü", "Göz", "Kedi", "Uçan Kuş", "Yaşlı Ağaç", "Çiçek (Lotus)"], value="Yok (Saf Soyut)", label="Opsiyonel Odak Nesnesi (Focal Point)", visible=False)
                     
                     audio_input = gr.Audio(type="filepath", label="Müzik Yükle (Kendi Dosyan)")
                     preset_audio = gr.Dropdown(choices=get_preset_audio_list(), label="Veya Hazır Müzik Seç (Otomatik Kırpılmış)") 
                     
-                    # [UX GÜNCELLEMESİ]: Bu kutu artık dinamik olarak kaybolup belirecek
                     start_time_input = gr.Number(value=0, label="Hangi Saniyeden Başlasın? (Sadece Yüklenen Dosyalar İçin)", precision=0)
                     
                     with gr.Group():
                         gr.Markdown("#### 🧮 Sinyal-Piksel Bükücü Algoritmalar")
-                        intensity_slider = gr.Slider(minimum=0.5, maximum=2.0, value=1.0, step=0.1, label="Adaptif Histogram Eğrisi (Logaritmik Işık Bükücü)", info="Sesin gürlüğüne oranla karanlık pikselleri ezer.")
-                        spatial_slider = gr.Slider(minimum=0.0, maximum=2.0, value=1.0, step=0.1, label="Mekansal Konvolüsyon (Tını Sürücülü Matris)", info="Müziğin Tınısına bağlı olarak Kenar Bulucu çekirdeğini tetikler.")
-                        kmeans_slider = gr.Slider(minimum=2, maximum=65, value=65, step=1, label="Vektörel Renk Kümeleme (K-Means Algoritması)", info="Pikselleri 3D uzayda kümeleyerek renk sayısını azaltır. (65 = Limitsiz/Devre Dışı)")
+                        intensity_slider = gr.Slider(minimum=0.5, maximum=2.0, value=1.0, step=0.1, label="Adaptif Histogram Eğrisi (Logaritmik Işık Bükücü)")
+                        spatial_slider = gr.Slider(minimum=0.0, maximum=2.0, value=1.0, step=0.1, label="Mekansal Konvolüsyon (Tını Sürücülü Matris)")
+                        kmeans_slider = gr.Slider(minimum=2, maximum=65, value=65, step=1, label="Vektörel Renk Kümeleme (K-Means)")
                     
                     btn_audio = gr.Button("🚀 Playlist Kapağını Sentezle", variant="primary")
                     audio_state = gr.State()
@@ -380,59 +441,19 @@ with gr.Blocks(css=custom_css, title="SENTA Laboratuvarı") as senta_app:
                         gr.Markdown("#### 🎨 Çıkan Dokuyu Beğenmedin mi?")
                         brush_options = gr.Dropdown(label="Müziğine uygun diğer 2 dokudan birini seç:", choices=[], interactive=True)
                         
-            # --- YENİ UX ETKİLEŞİMLERİ ---
-            preset_audio.change(
-                fn=handle_preset_selection, 
-                inputs=[preset_audio], 
-                outputs=[audio_input, start_time_input]
-            )
+            preset_audio.change(fn=handle_preset_selection, inputs=[preset_audio], outputs=[audio_input, start_time_input])
             
-            audio_input.change(
-                fn=handle_user_upload, 
-                inputs=[audio_input], 
-                outputs=[preset_audio, start_time_input]
-            )
-            # -----------------------------
-
-            audio_mode_radio.change(
-                fn=lambda mode: gr.update(visible="Pro" in mode),
-                inputs=[audio_mode_radio],
-                outputs=[target_concept_dropdown],
-                show_progress="hidden"
-            )
+            # [YENİ]: Kullanıcı dosyayı yüklediği anda Akıllı Kesim Motoru tetiklenir
+            audio_input.change(fn=handle_user_upload, inputs=[audio_input], outputs=[preset_audio, start_time_input])
             
-            btn_audio.click(
-                fn=process_primary_generation,
-                inputs=[audio_input, preset_audio, start_time_input, audio_mode_radio, target_concept_dropdown, intensity_slider, spatial_slider, kmeans_slider],
-                outputs=[audio_output_img, audio_log, brush_options, alt_column, audio_state]
-            )
+            audio_mode_radio.change(fn=lambda mode: gr.update(visible="Pro" in mode), inputs=[audio_mode_radio], outputs=[target_concept_dropdown], show_progress="hidden")
             
-            brush_options.change(
-                fn=process_alternative_generation,
-                inputs=[audio_state, brush_options, audio_mode_radio, target_concept_dropdown, intensity_slider, spatial_slider, kmeans_slider],
-                outputs=[audio_output_img, audio_log, audio_state]
-            )
+            btn_audio.click(fn=process_primary_generation, inputs=[audio_input, preset_audio, start_time_input, audio_mode_radio, target_concept_dropdown, intensity_slider, spatial_slider, kmeans_slider], outputs=[audio_output_img, audio_log, brush_options, alt_column, audio_state])
+            brush_options.change(fn=process_alternative_generation, inputs=[audio_state, brush_options, audio_mode_radio, target_concept_dropdown, intensity_slider, spatial_slider, kmeans_slider], outputs=[audio_output_img, audio_log, audio_state])
             
-            intensity_slider.release(
-                fn=apply_all_post_processing,
-                inputs=[audio_state, intensity_slider, spatial_slider, kmeans_slider],
-                outputs=[audio_output_img, audio_log],
-                show_progress="hidden"
-            )
-            
-            spatial_slider.release(
-                fn=apply_all_post_processing,
-                inputs=[audio_state, intensity_slider, spatial_slider, kmeans_slider],
-                outputs=[audio_output_img, audio_log],
-                show_progress="hidden"
-            )
-            
-            kmeans_slider.release(
-                fn=apply_all_post_processing,
-                inputs=[audio_state, intensity_slider, spatial_slider, kmeans_slider],
-                outputs=[audio_output_img, audio_log],
-                show_progress="hidden"
-            )
+            intensity_slider.release(fn=apply_all_post_processing, inputs=[audio_state, intensity_slider, spatial_slider, kmeans_slider], outputs=[audio_output_img, audio_log], show_progress="hidden")
+            spatial_slider.release(fn=apply_all_post_processing, inputs=[audio_state, intensity_slider, spatial_slider, kmeans_slider], outputs=[audio_output_img, audio_log], show_progress="hidden")
+            kmeans_slider.release(fn=apply_all_post_processing, inputs=[audio_state, intensity_slider, spatial_slider, kmeans_slider], outputs=[audio_output_img, audio_log], show_progress="hidden")
 
         with gr.TabItem("🖼️ Fotoğrafa Sanat İşle (Stylization)"):
             with gr.Row():
@@ -442,14 +463,22 @@ with gr.Blocks(css=custom_css, title="SENTA Laboratuvarı") as senta_app:
                     img_content = gr.Image(type="numpy", label="Fotoğrafını Yükle")
                     
                     with gr.Group():
-                        auto_mode_check = gr.Checkbox(label="AI En İyi 10 Eseri Önersin (Otomatik Mod)")
+                        gr.Markdown("#### 🧮 Makine Öğrenmesi Parametreleri")
+                        style_weight_slider = gr.Slider(minimum=0.0, maximum=1.0, value=1.0, step=0.05, label="Stil Yoğunluğu (ML İnterpolasyonu)")
+
+                    with gr.Group():
+                        auto_mode_check = gr.Checkbox(label="AI Taraması Başlat (Otomatik Mod)")
                         
                         with gr.Column(visible=True) as manual_selection_col:
                             artist_dropdown = gr.Dropdown(choices=get_all_artists(), label="Sanatçı Seç")
                             artwork_dropdown = gr.Dropdown(choices=[], label="Eser Seç")
                         
                         with gr.Column(visible=False) as auto_selection_col:
-                            btn_scan = gr.Button("🔍 500 Eser Arasında AI Taramasını Başlat", elem_classes="scan-btn")
+                            gr.Markdown("##### ⚙️ Tarama Seçenekleri")
+                            max_scan_slider = gr.Slider(minimum=500, maximum=2127, value=1000, step=1, label="Kaç eser arasında aransın? (Havuz Limiti)")
+                            top_k_slider = gr.Slider(minimum=2, maximum=10, value=5, step=1, label="En uyumlu kaç eser gösterilsin? (Top-K)")
+                            
+                            btn_scan = gr.Button("🔍 Belirlenen Kriterlerle Taramayı Başlat", elem_classes="scan-btn")
                             top_10_gallery = gr.Gallery(label="AI Önerileri (Seçmek için resme tıklayın)", columns=5, height="auto", allow_preview=False)
                             top_10_state = gr.State([])
                             selected_gallery_idx = gr.State(None)
@@ -459,23 +488,43 @@ with gr.Blocks(css=custom_css, title="SENTA Laboratuvarı") as senta_app:
                 with gr.Column(scale=1):
                     gr.Markdown("### STİLİZE ÇIKTI")
                     img_output = gr.Image(label="İşlenmiş Görsel")
-                    img_log = gr.Textbox(label="Sentez Analizi", lines=16)
+                    img_state = gr.State() 
+                    
+                    with gr.Group():
+                        gr.Markdown("#### 🎨 Çıktıyı İyileştir (Canlı Post-Processing)")
+                        sharpness_slider = gr.Slider(minimum=0.0, maximum=3.0, value=0.0, step=0.1, label="Yapısal Keskinlik (Unsharp Mask)")
+                        saturation_slider = gr.Slider(minimum=0.5, maximum=2.0, value=1.0, step=0.1, label="Renk Doygunluğu (Vibrance)")
+                        contrast_slider = gr.Slider(minimum=1.0, maximum=4.0, value=1.0, step=0.1, label="Lokal Kontrast (CLAHE)")
 
-            artist_dropdown.change(
-                fn=lambda x: gr.update(choices=get_artworks_by_artist(x), value=None), 
-                inputs=artist_dropdown, 
-                outputs=artwork_dropdown,
-                show_progress="hidden"
+                    img_log = gr.Textbox(label="Sentez Analizi", lines=10)
+
+            artist_dropdown.change(fn=lambda x: gr.update(choices=get_artworks_by_artist(x), value=None), inputs=artist_dropdown, outputs=artwork_dropdown, show_progress="hidden")
+            auto_mode_check.change(fn=toggle_auto_mode, inputs=[auto_mode_check], outputs=[manual_selection_col, auto_selection_col], show_progress="hidden")
+            
+            btn_scan.click(
+                fn=initialize_auto_scan, 
+                inputs=[img_content, max_scan_slider, top_k_slider], 
+                outputs=[top_10_gallery, top_10_state, img_log]
             )
-            auto_mode_check.change(
-                fn=toggle_auto_mode, 
-                inputs=[auto_mode_check], 
-                outputs=[manual_selection_col, auto_selection_col],
-                show_progress="hidden"
-            )
-            btn_scan.click(fn=initialize_auto_scan, inputs=[img_content], outputs=[top_10_gallery, top_10_state, img_log])
+            
             top_10_gallery.select(fn=save_gallery_selection, outputs=[selected_gallery_idx, btn_img])
-            btn_img.click(fn=process_image_to_image, inputs=[img_content, auto_mode_check, artist_dropdown, artwork_dropdown, top_10_state, selected_gallery_idx, img_mode_radio], outputs=[img_output, img_log])
+            
+            btn_img.click(
+                fn=process_image_to_image, 
+                inputs=[img_content, auto_mode_check, artist_dropdown, artwork_dropdown, top_10_state, selected_gallery_idx, img_mode_radio, style_weight_slider], 
+                outputs=[img_output, img_log, img_state]
+            )
+
+            style_weight_slider.release(
+                fn=process_image_to_image, 
+                inputs=[img_content, auto_mode_check, artist_dropdown, artwork_dropdown, top_10_state, selected_gallery_idx, img_mode_radio, style_weight_slider], 
+                outputs=[img_output, img_log, img_state],
+                show_progress="hidden"
+            )
+            
+            sharpness_slider.release(fn=live_image_post_processing, inputs=[img_state, sharpness_slider, saturation_slider, contrast_slider], outputs=[img_output], show_progress="hidden")
+            saturation_slider.release(fn=live_image_post_processing, inputs=[img_state, sharpness_slider, saturation_slider, contrast_slider], outputs=[img_output], show_progress="hidden")
+            contrast_slider.release(fn=live_image_post_processing, inputs=[img_state, sharpness_slider, saturation_slider, contrast_slider], outputs=[img_output], show_progress="hidden")
 
 if __name__ == "__main__":
-    senta_app.launch()
+    senta_app.launch(inbrowser=True)
