@@ -149,8 +149,18 @@ python app.py
 
 ## 🎨 Eser Havuzu (Dataset) Hakkında
 
-- **Kullanıma Hazır Demo Paketi:** Repoyu klonladığınızda `dataset/` dizininde sistemin test edilmesi için seçilmiş örnek referans kübist eserler ve test müzikleri hazır olarak gelir.
-- **Genişletilmiş 2.300+ Eserlik Arşiv:** Proje kapsamında derlenen tam Kübist sanat veri ambarı (Analitik, Sentetik ve Proto-Kübizm) GitHub Releases sekmesinden indirilebilir veya `python download_dataset.py` komutuyla otomatik olarak kurulabilir.
+Sistem iki farklı veri boyutuyla tam uyumlu çalışmaktadır:
+
+1. **Hazır Çekirdek Paket (Out-of-the-Box Demo):**
+   - Repoyu klonladığınızda `dataset/` dizininde gelen seçkin referans Kübist eserler ve test müzikleri sayesinde **ek hiçbir dosya indirmeden** sistemi doğrudan başlatabilir (`python app.py`), tüm üretim ve stil aktarım aşamalarını test edebilirsiniz.
+
+2. **Genişletilmiş 2.300+ Eserlik Tam Veri Ambarı (Full Research Dataset):**
+   - Tez ve araştırma kapsamında derlenen tam Kübist sanat veri ambarı (Analitik, Sentetik ve Proto-Kübizm olmak üzere 2.300'den fazla eser), GitHub dosya boyutu limitleri nedeniyle ana deponun dışında tutulmaktadır.
+   - **Releases Üzerinden İndirme:** Bu arşivi doğrudan reponun **[Releases](https://github.com/Warkrone34/Solenta/releases)** sekmesinden (`solenta_dataset.zip`) tek tıkla indirebilir ve arşiv içeriğini projenin `dataset/` klasörüne çıkartabilirsiniz.
+   - **Otomatik Kurulum Aracı:** Alternatif olarak proje ana dizininde terminalden şu komutu çalıştırmanız yeterlidir:
+     ```bash
+     python download_dataset.py
+     ```
 
 ---
 
