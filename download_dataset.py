@@ -41,8 +41,10 @@ def download_and_extract_dataset(url=DATASET_RELEASE_URL):
             urllib.request.urlretrieve(url, zip_path, reporthook=report_progress)
             print("\n[*] İndirme tamamlandı.")
         except Exception as e:
-            print(f"\n[!] Otomatik indirme bağlantısına erişilemedi: {e}")
-            print("[i] Alternatif: 'solenta_dataset.zip' dosyasını proje ana dizinine koyup bu betiği tekrar çalıştırabilirsiniz.")
+            print(f"\n[i] Genişletilmiş 2.300+ eser arşivi bulut bağlantısı henüz aktif değil veya çevrimdışı ({e}).")
+            print("[✓] SOLENTA, repo ile birlikte gelen çekirdek referans eser havuzuyla (dataset/) tam fonksiyonel olarak çalışmaya hazırdır.")
+            print("[✓] 'python app.py' komutuyla projeyi hemen başlatabilirsiniz.")
+            print("[i] Yerel arşiviniz varsa: 'solenta_dataset.zip' dosyasını proje ana dizinine koyup bu betiği tekrar çalıştırabilirsiniz.")
             return False
 
     print(f"[*] Arşiv 'dataset' klasörüne ayıklanıyor...")
