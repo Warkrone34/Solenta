@@ -153,10 +153,8 @@ python app.py
 
 ## 📊 Evaluation & Academic Defense / Akademik Değerlendirme
 
-- **Proje Türü:** Bilgisayar Mühendisliği / Yapay Zeka Lisans Bitirme Tezi
-- **Derece / Not:** **BA**
-- **Jüri:** 3 Üniversite Öğretim Üyesi (Bölüm Başkanı Onaylı)
-- **Akademik Danışman & Katkı:** *[Danışman Bilgisi / Bölüm Başkanı İsmi - İzin doğrultusunda güncellenecektir]*
+- **Proje Türü:** Bilgisayar Programcılığı / Bitirme Tezi
+- **Akademik Danışman & Katkıda ek katkıda bulunanlar:** *[Danışman Bilgisi / Bölüm Başkanı İsmi - İzin doğrultusunda güncellenecektir]*
 
 ---
 
