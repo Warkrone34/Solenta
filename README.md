@@ -7,7 +7,6 @@
 [![Gradio](https://img.shields.io/badge/UI-Gradio%20Blocks-orange.svg?logo=gradio&logoColor=white)](https://gradio.app/)
 [![OpenCV](https://img.shields.io/badge/OpenCV-4.11-5C3EE8.svg?logo=opencv&logoColor=white)](https://opencv.org/)
 [![Librosa](https://img.shields.io/badge/Audio-Librosa%20DSP-yellow.svg)](https://librosa.org/)
-[![Academic Thesis](https://img.shields.io/badge/Degree-Thesis%20(BA%20Grade)-success.svg)](https://github.com/Warkrone34/Solenta)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
