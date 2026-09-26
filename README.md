@@ -17,9 +17,6 @@
 
 Proje, yalnızca hazır bir difüzyon sarmalayıcısı (wrapper) olmak yerine; **dijital sinyal işleme (DSP)**, **geometrik hesaplamalı topoloji (Voronoi şeması)**, **renk kuramı ve Gestalt algısı (Eşzamanlı Kontrast, K-Means++)** ve **çift motorlu nöral sentez (Neural Style Transfer + ControlNet Depth-to-Image with LCM Turbo)** aşamalarını birbirine bağlayan uçtan uca açıklanabilir (**Explainable / White-Box**) bir bilişsel mimari sunar.
 
-> [!NOTE]
-> Bu çalışma, **3 üniversite öğretim üyesinden oluşan tez jürisi (içlerinde Bölüm Başkanı dahil)** onayından geçmiş ve **BA derecesi** ile kabul edilmiştir.
-
 ---
 
 ## 🏗️ System Architecture / Mimari İş Akışı
