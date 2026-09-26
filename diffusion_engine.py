@@ -39,6 +39,21 @@ def get_model_path(hub_id, local_folder_name):
 _PIPELINE = None
 _DEPTH_ESTIMATOR = None
 
+def get_safe_device():
+    """
+    Neden Eklendi: Donanım mimarisini ve CUDA çekirdek uyumluluğunu (sm_120 / Blackwell vb.)
+    küçük bir tensör operasyonu ile doğrulayarak en güvenli ve kararlı aygıtı (cuda veya cpu) seçer.
+    """
+    if torch.cuda.is_available():
+        try:
+            t = torch.zeros(1, device="cuda")
+            _ = t + 1
+            return "cuda"
+        except Exception as e:
+            print(f"[SOLENTA UYARI]: CUDA aygıtı saptandı ancak kurulu PyTorch çekirdeği ile uyumsuz ({e}). Güvenli CPU moduna geçiliyor...")
+            return "cpu"
+    return "cpu"
+
 def get_depth_map(image_pil):
     """
     Neden Eklendi: Girdi görselinden uzaysal derinlik (Z-Axis) matrisi çıkarmak için.
@@ -48,7 +63,7 @@ def get_depth_map(image_pil):
     global _DEPTH_ESTIMATOR
     if _DEPTH_ESTIMATOR is None:
         print("[SOLENTA V2]: MiDaS Derinlik Algisi (Depth Map) Motoru Yukleniyor...")
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = get_safe_device()
         midas_path = get_model_path("Intel/dpt-hybrid-midas", "dpt-hybrid-midas")
         
         # [ZIRH]: Yerel model varsa diskten okur, yoksa HuggingFace Hub'dan otonom indirir
@@ -78,7 +93,7 @@ def get_diffusion_pipeline():
         return _PIPELINE
         
     print("[SOLENTA V2]: Depth ControlNet ve LCM Turbo Yukleniyor (Sarsilmaz Surum)...")
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = get_safe_device()
 
     try:
         cnet_path = get_model_path("lllyasviel/sd-controlnet-depth", "sd-controlnet-depth")
@@ -322,40 +337,43 @@ def synthesize_fusion_art(base_image, style_reference, is_music_mode=False, targ
 # Sistemin soguk baslatmadan (Cold Start) kaynakli kilitlenmesini onler.
 # =====================================================================
 def _warmup_engine():
-    print("\n" + "="*60)
-    print("[SOLENTA V2]: MOTOR ISITMA PROTOKOLU BASLATILIYOR (WARM-UP)")
-    print("="*60)
-    print("[SOLENTA V2]: 1/4 - MiDaS ve LCM Turbo Modelleri VRAM'e Cekiliyor...")
-    
-    pipe = get_diffusion_pipeline()
-    
-    if pipe is not None:
-        print("[SOLENTA V2]: 2/4 - Sahte (Dummy) Matris Uretiliyor...")
-        dummy_matrix = np.zeros((512, 512, 3), dtype=np.uint8)
-        dummy_pil = Image.fromarray(dummy_matrix)
+    try:
+        print("\n" + "="*60)
+        print("[SOLENTA V2]: MOTOR ISITMA PROTOKOLU BASLATILIYOR (WARM-UP)")
+        print("="*60)
+        print("[SOLENTA V2]: 1/4 - MiDaS ve LCM Turbo Modelleri VRAM'e Cekiliyor...")
         
-        print("[SOLENTA V2]: 3/4 - MiDaS Derinlik Motoru Kor Atesleme Yapiyor...")
-        dummy_depth = get_depth_map(dummy_pil)
+        pipe = get_diffusion_pipeline()
         
-        print("[SOLENTA V2]: 4/4 - LCM Turbo CUDA Cekirdekleri Isitiliyor (Lutfen Bekleyin)...")
-        try:
-            # DUZELTME: Tensor cokusunu onlemek icin negative_prompt ve 4 step eklendi.
-            _ = pipe(
-                prompt="a black square",
-                negative_prompt="nothing",
-                image=dummy_pil,
-                control_image=dummy_depth,
-                strength=0.5,
-                controlnet_conditioning_scale=0.5,
-                num_inference_steps=4,
-                guidance_scale=1.5
-            )
-            print("-" * 60)
-            print("[SOLENTA V2]: WARM-UP TAMAMLANDI! Motorlar jilet gibi, rolantide bekliyor.")
-            print("=" * 60 + "\n")
-        except Exception as e:
-            print(f"[KRITIK HATA]: Isitma sirasinda motor coktu! Hata: {e}")
-    else:
-        print("[KRITIK HATA]: Modeller yuklenemedigi icin isitma iptal edildi.")
+        if pipe is not None:
+            print("[SOLENTA V2]: 2/4 - Sahte (Dummy) Matris Uretiliyor...")
+            dummy_matrix = np.zeros((512, 512, 3), dtype=np.uint8)
+            dummy_pil = Image.fromarray(dummy_matrix)
+            
+            print("[SOLENTA V2]: 3/4 - MiDaS Derinlik Motoru Kor Atesleme Yapiyor...")
+            dummy_depth = get_depth_map(dummy_pil)
+            
+            print("[SOLENTA V2]: 4/4 - LCM Turbo CUDA Cekirdekleri Isitiliyor (Lutfen Bekleyin)...")
+            try:
+                # DUZELTME: Tensor cokusunu onlemek icin negative_prompt ve 4 step eklendi.
+                _ = pipe(
+                    prompt="a black square",
+                    negative_prompt="nothing",
+                    image=dummy_pil,
+                    control_image=dummy_depth,
+                    strength=0.5,
+                    controlnet_conditioning_scale=0.5,
+                    num_inference_steps=4,
+                    guidance_scale=1.5
+                )
+                print("-" * 60)
+                print("[SOLENTA V2]: WARM-UP TAMAMLANDI! Motorlar jilet gibi, rolantide bekliyor.")
+                print("=" * 60 + "\n")
+            except Exception as e:
+                print(f"[UYARI]: İnferans ısınması atlandı: {e}")
+        else:
+            print("[UYARI]: Modeller yüklenemediği için ısınma atlandı.")
+    except Exception as e_top:
+        print(f"[UYARI]: Isınma protokolü atlandı ({e_top}). Arayüz başlatılıyor...")
 
 _warmup_engine()
