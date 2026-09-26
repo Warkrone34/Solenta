@@ -2,9 +2,8 @@
 ## Müzikal Determinantlar ve Akıllı Geometrik Sentez Yoluyla Görsel Sanat Üretim Laboratuvarı
 
 **Yazar:** Ömer Faruk SAĞLAM  
-**Proje:** Tez Final ve Sistem Analizi Raporu  
-**Danışman:** Refik Tanju SİRMEN  
-**Program:** Bilgisayar Teknolojileri Bölümü, Bilgisayar Programcılığı  
+**Proje:** Tez Final ve Sistem Analizi Raporu   
+**Program:** DMYO, Bilgisayar Programcılığı  
 
 ---
 
