@@ -51,9 +51,10 @@ def get_depth_map(image_pil):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         midas_path = get_model_path("Intel/dpt-hybrid-midas", "dpt-hybrid-midas")
         
-        # [ZIRH]: Pipeline yerine manuel yükleme ile dosya formatı (bin/safetensors) kısıtlamasını aşıyoruz.
-        processor = AutoImageProcessor.from_pretrained(midas_path, local_files_only=True)
-        model = AutoModelForDepthEstimation.from_pretrained(midas_path, local_files_only=True).to(device)
+        # [ZIRH]: Yerel model varsa diskten okur, yoksa HuggingFace Hub'dan otonom indirir
+        is_midas_local = os.path.exists(midas_path)
+        processor = AutoImageProcessor.from_pretrained(midas_path, local_files_only=is_midas_local)
+        model = AutoModelForDepthEstimation.from_pretrained(midas_path, local_files_only=is_midas_local).to(device)
         _DEPTH_ESTIMATOR = {"model": model, "processor": processor, "device": device}
     
     inputs = _DEPTH_ESTIMATOR["processor"](images=image_pil, return_tensors="pt").to(_DEPTH_ESTIMATOR["device"])
@@ -81,15 +82,16 @@ def get_diffusion_pipeline():
 
     try:
         cnet_path = get_model_path("lllyasviel/sd-controlnet-depth", "sd-controlnet-depth")
-        # [ZIRH]: local_files_only=True EKLENDI
+        is_cnet_local = os.path.exists(cnet_path)
         controlnet = ControlNetModel.from_pretrained(
             cnet_path, 
             torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-            local_files_only=True,
+            local_files_only=is_cnet_local,
             use_safetensors=True  # [EXE ZIRHI]: Safetensors okumaya zorlar
         )
         
         sd_path = get_model_path("runwayml/stable-diffusion-v1-5", "stable-diffusion-v1-5")
+        is_sd_local = os.path.exists(sd_path)
         
         # =====================================================================
         # [BAŞ MİMAR ZIRHI]: OTONOM ÇİFT-AŞAMALI YÜKLEYİCİ (DUAL-LOAD ARMOR)
@@ -102,7 +104,7 @@ def get_diffusion_pipeline():
                 controlnet=controlnet, 
                 torch_dtype=torch.float16 if device == "cuda" else torch.float32,
                 safety_checker=None,
-                local_files_only=True,
+                local_files_only=is_sd_local,
                 use_safetensors=True
             )
         except Exception as e_term:
@@ -113,15 +115,13 @@ def get_diffusion_pipeline():
                 controlnet=controlnet, 
                 torch_dtype=torch.float16 if device == "cuda" else torch.float32,
                 safety_checker=None,
-                local_files_only=True,
+                local_files_only=is_sd_local,
                 use_safetensors=True,
                 variant="fp16"
             )
         # =====================================================================
         
         lcm_path = get_model_path("latent-consistency/lcm-lora-sdv1-5", "lcm-lora-sdv1-5")
-        # [ZIRH]: local_files_only=True EKLENDI
-        # [KİLİDİ KIRAN DÜZELTME]: Offline modda weight_name belirtmek zorunludur!
         if os.path.isdir(lcm_path):
             lora_files = [f for f in os.listdir(lcm_path) if f.endswith(('.safetensors', '.bin'))]
             if lora_files:
@@ -129,7 +129,8 @@ def get_diffusion_pipeline():
             else:
                 raise FileNotFoundError(f"KRİTİK HATA: LCM klasörü boş: {lcm_path}")
         else:
-            raise FileNotFoundError(f"KRİTİK HATA: LCM klasörü eksik!")
+            print("[SOLENTA V2]: LCM LoRA ağırlıkları HuggingFace Hub üzerinden otonom indiriliyor...")
+            pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
 
         pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
         

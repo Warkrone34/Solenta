@@ -20,11 +20,12 @@ if sys.stderr is None:
     
 # =====================================================================
 # [SISTEM YAPILANDIRMASI 2]: Çevrimdisi (Air-Gapped) Calisma Ortami
-# Neden Eklendi: Uygulamanin dış aglara baglanmasini engellemek ve yalnizca
-# yerel (local) _internal dizinindeki agirlik (weight) dosyalarini okumaya zorlamak.
+# Neden Eklendi: Derlenmiş exe paketinde yerel modelleri kullanır;
+# Python geliştirici ortamında ise eksik modellerin otomatik indirilmesine izin verir.
 # =====================================================================
-os.environ["HF_HUB_OFFLINE"] = "1"
-os.environ["TRANSFORMERS_OFFLINE"] = "1"
+if getattr(sys, 'frozen', False):
+    os.environ["HF_HUB_OFFLINE"] = "1"
+    os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
 # =====================================================================
 # [SISTEM YAPILANDIRMASI 3]: PyInstaller Bağımlılık Onarimi (Self-Healing)

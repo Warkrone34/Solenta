@@ -7,15 +7,20 @@
 [![Gradio](https://img.shields.io/badge/UI-Gradio%20Blocks-orange.svg?logo=gradio&logoColor=white)](https://gradio.app/)
 [![OpenCV](https://img.shields.io/badge/OpenCV-4.11-5C3EE8.svg?logo=opencv&logoColor=white)](https://opencv.org/)
 [![Librosa](https://img.shields.io/badge/Audio-Librosa%20DSP-yellow.svg)](https://librosa.org/)
+[![Academic Project](https://img.shields.io/badge/Academic-Graduation%20Project-informational.svg)](docs/PROJE_RAPORU.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
 
 ## 📌 Abstract / Proje Özeti
 
-**SOLENTA (Synesthetic Generative Laboratory)**, işitsel sinyalleri (müzik ve ses frekansları) plastik sanat eserleriyle (özellikle Kübist akım) ve yapay görme algoritmalarıyla birleştiren, çok disiplinli (**Multidisciplinary**) bir görüntü işleme ve üretken yapay zeka (**Generative AI**) tez projesidir.
+**SOLENTA (Synesthetic Generative Laboratory)**, işitsel sinyalleri (müzik ve ses frekansları) plastik sanat eserleriyle (özellikle Kübist akım) ve yapay görme algoritmalarıyla birleştiren, çok disiplinli (**Multidisciplinary**) bir görüntü işleme ve üretken yapay zeka (**Generative AI**) bitirme projesidir.
 
 Proje, yalnızca hazır bir difüzyon sarmalayıcısı (wrapper) olmak yerine; **dijital sinyal işleme (DSP)**, **geometrik hesaplamalı topoloji (Voronoi şeması)**, **renk kuramı ve Gestalt algısı (Eşzamanlı Kontrast, K-Means++)** ve **çift motorlu nöral sentez (Neural Style Transfer + ControlNet Depth-to-Image with LCM Turbo)** aşamalarını birbirine bağlayan uçtan uca açıklanabilir (**Explainable / White-Box**) bir bilişsel mimari sunar.
+
+> [!NOTE]
+> Bu çalışma, bilgisayar teknolojileri ve yapay zekâ bitirme projesi kapsamında geliştirilmiş, yazılım mimarisi ve sistem analizi metodolojileriyle belgelendirilmiş kapsamlı bir araştırma ve geliştirme çalışmasıdır.  
+> 📄 Detaylı akademik rapor için: **[Sistem Analizi ve Tasarımı Raporu (docs/PROJE_RAPORU.md)](docs/PROJE_RAPORU.md)**
 
 ---
 
@@ -70,6 +75,7 @@ flowchart TD
 ### 4. Çift Motorlu Hibrit Yapay Zeka (`nst_engine.py` & `diffusion_engine.py`)
 - **Light Mod (Mobil/Hafif Sistemler):** Google Magenta Arbitrary Image Stylization modeli üzerinden ileri besleme (Feed-Forward). NST modellerindeki renk solmasını (Color Shift) önlemek adına LAB renk uzayında Luminance korumalı **SOLENTA Signature Enhancement** rötüşü uygulanır.
 - **Pro Mod (Yüksek Başarımlı CUDA):** Intel MiDaS ile derinlik haritası (Z-Axis Depth Map) çıkarılır. Stable Diffusion 1.5, ControlNet Depth koşullandırması ve Latent Consistency Model (LCM) LoRA çekirdeği ile 4-6 adımda fotogerçekçi sentez üretir.
+- **Otonom Model İndirme:** Sistem çalıştırıldığında yerel modeller yoksa HuggingFace Hub ve TFHub üzerinden eksik ağırlıkları otomatik olarak çeker ve önbelleğe alır.
 
 ---
 
@@ -85,9 +91,12 @@ Solenta/
 ├── filter_engine.py         # Laplacian dinamik konvolüsyon & K-Means kuantizasyon
 ├── nst_engine.py            # Magenta NST (VGG-19) & LAB renk restorasyonu
 ├── solenta_logger.py        # Deterministik JSON ETL / Data Lake loglama motoru
+├── download_dataset.py      # Genişletilmiş veri ambarı (2.300+ eser) indirme aracı
 ├── requirements.txt         # Standart ve temiz bağımlılık listesi (UTF-8)
 ├── LICENSE                  # MIT Açık Kaynak Lisansı
 ├── .gitignore               # Model, venv, build ve 100MB+ dosyaları süzen filtre
+├── docs/
+│   └── PROJE_RAPORU.md      # Detaylı Sistem Analizi ve Tasarımı Raporu (UML & DFD)
 └── dataset/
     ├── analitik/            # Örnek analitik kübist referans eserler
     ├── sentetik/            # Örnek sentetik kübist referans eserler
@@ -104,7 +113,7 @@ Solenta/
 - **Python:** 3.10 veya 3.11 önerilir
 - **Donanım:** 
   - *Light Mod:* Herhangi bir modern CPU (veya entegre GPU)
-  - *Pro Mod:* En az 6 GB VRAM destekli NVIDIA GPU (CUDA 12+)
+  - *Pro Mod:* En az 4-6 GB VRAM destekli NVIDIA GPU (CUDA 12+)
 
 ### 2. Klonlama ve Sanal Ortam Kurulumu
 ```bash
@@ -134,23 +143,23 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 ```bash
 python app.py
 ```
-> Sunucu çalıştığında varsayılan tarayıcınızda otomatik olarak `http://127.0.0.1:7860` adresinde açılacaktır.
+> Sunucu çalıştığında varsayılan tarayıcınızda otomatik olarak `http://127.0.0.1:7860` adresinde açılacaktır. İlk çalıştırmada Pro Mod seçilirse gerekli model ağırlıkları HuggingFace üzerinden otomatik indirilecektir.
 
 ---
 
-## 🎨 Modes of Operation / Kullanım Modları
+## 🎨 Eser Havuzu (Dataset) Hakkında
 
-| Mod | Girdi Türü | Kullanılan Motor | Açıklama |
-| :--- | :--- | :--- | :--- |
-| **Müzikten Görsel Üret** | `.mp3` veya `.wav` ses dosyası | Voronoi + NST veya LCM Turbo | Müziğin frekanslarından soyut/figüratif sanat eseri sentezler. |
-| **Fotoğrafa Sanat İşle** | Kullanıcı fotoğrafı + Referans Sanat Eseri | MiDaS + ControlNet veya NST | Fotoğrafın mekansal yapısını koruyarak Kübist sanat stilini aktarır. |
+- **Kullanıma Hazır Demo Paketi:** Repoyu klonladığınızda `dataset/` dizininde sistemin test edilmesi için seçilmiş örnek referans kübist eserler ve test müzikleri hazır olarak gelir.
+- **Genişletilmiş 2.300+ Eserlik Arşiv:** Proje kapsamında derlenen tam Kübist sanat veri ambarı (Analitik, Sentetik ve Proto-Kübizm) GitHub Releases sekmesinden indirilebilir veya `python download_dataset.py` komutuyla otomatik olarak kurulabilir.
 
 ---
 
-## 📊 Evaluation & Academic Defense / Akademik Değerlendirme
+## 📊 Academic Context & Contributors / Akademik Bağlam ve Katkılar
 
 - **Proje Türü:** Bilgisayar Programcılığı / Bitirme Tezi
-- **Akademik Danışman & Katkıda ek katkıda bulunanlar:** *[Danışman Bilgisi / Bölüm Başkanı İsmi - İzin doğrultusunda güncellenecektir]*
+- **Geliştirici:** Ömer Faruk SAĞLAM
+- **Akademik Danışman & Katkıda Bulunanlar:** *[Danışman Bilgisi / Bölüm Başkanı İsmi - İzin doğrultusunda güncellenecektir]*
+- **Detaylı Sistem Analizi Raporu:** [docs/PROJE_RAPORU.md](docs/PROJE_RAPORU.md)
 
 ---
 
