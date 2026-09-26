@@ -105,9 +105,13 @@ def analyze_audio_determinants(audio_path, start_time=0.0, duration=10.0):
         # Önceden tanımlı bellek optimizasyonlu (LRU) fonksiyon ile ses dosyasını okur.
         y, sr = fetch_audio_buffer(audio_path, start_time, duration)
         
-        # Dosyada okunacak herhangi bir frekans verisi yoksa işlemi kilitler.
+        # Dosyada okunacak herhangi bir frekans verisi yoksa islemi kilitler.
         if len(y) == 0:
              return None, "SİSTEM HATASI: Sinyal verisi okunamadi.", None, None
+
+        # Sinyal tamamen sessizse (mikrofon kapali, yanlis ses aygiti veya sifir genlik) net uyari verir.
+        if np.max(np.abs(y)) < 1e-4:
+             return None, "SES UYARISI: Algilanan ses tamamen sessiz (Genlik: 0). Lutfen mikrofonunuzun acik oldugunu, dogru giris aygitinin (or. Razer Seiren Mini) secili oldugunu ve tarayici mikrofon izinlerini kontrol ediniz.", None, None
 
         # [HIZLI FOURIER DÖNÜŞÜMÜ (FFT) VE BLOKLAMA YAPILANDIRMASI]
         # Yaklaşık 46 milisaniyelik vuruşları (transient) yakalamak için örnekleme hızına bağlı dinamik bir pencere (window) hesaplanır.

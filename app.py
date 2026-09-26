@@ -644,7 +644,7 @@ with gr.Blocks(css=custom_css, title="Solenta Laboratuvari") as solenta_app:
                     
                     target_concept_dropdown = gr.Dropdown(choices=["Yok (Saf Soyut)", "İnsan Yüzü", "Göz", "Kedi", "Uçan Kuş", "Yaşlı Ağaç", "Çiçek (Lotus)"], value="Yok (Saf Soyut)", label="Opsiyonel Odak Nesnesi (Focal Point)", visible=False)
                     
-                    audio_input = gr.Audio(type="filepath", label="Muzik Yukle (Kendi Dosyaniz)")
+                    audio_input = gr.Audio(sources=["upload", "microphone"], type="filepath", label="Muzik Yukle veya Mikrofondan Kaydet")
                     preset_audio = gr.Dropdown(choices=get_preset_audio_list(), label="Veya Veritabanindan Muzik Secin") 
                     
                     start_time_input = gr.Number(value=0, label="Baslangic Saniyesi (Smart Crop Tespiti)", precision=0)
