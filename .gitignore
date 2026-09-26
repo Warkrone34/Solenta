@@ -1,0 +1,64 @@
+# =====================================================================
+# SENTA - Git Ignore Configuration
+# =====================================================================
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# PyInstaller / Distribution & executable builds
+build/
+dist/
+*.spec
+_internal/
+
+# Deep Learning weights & Model checkpoints
+# Note: Models are automatically fetched from Hugging Face Hub / TF Hub
+models/
+senta_ai_models/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.h5
+*.onnx
+
+# Generated logs, crash reports, and local data lake
+CRASH_LOG.txt
+senta_export_logs/
+senta_training_dataset/
+*.log
+
+# Large Image Datasets (Exclude full 900MB+ dataset, keep sample art for demo)
+dataset/analitik/*
+dataset/sentetik/*
+dataset/proto/*
+!dataset/analitik/.gitkeep
+!dataset/sentetik/.gitkeep
+!dataset/proto/.gitkeep
+!dataset/analitik/albert-gleizes_*.jpg
+!dataset/sentetik/ad-reinhardt_*.jpg
+!dataset/proto/adolf-fleischmann_*.jpg
+!dataset/proto/afro_*.jpg
+
+# Operating system & Editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

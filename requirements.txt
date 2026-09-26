@@ -1,0 +1,32 @@
+# =====================================================================
+# SENTA - Project Requirements & Dependencies
+# =====================================================================
+
+# Web Interface
+gradio>=4.36.0
+
+# Audio & Digital Signal Processing (DSP)
+librosa>=0.10.0
+soundfile>=0.12.0
+scipy>=1.11.0
+
+# Computer Vision & Image Processing
+opencv-python>=4.8.0
+numpy>=1.24.0,<2.0.0
+pillow>=10.0.0
+
+# Neural Style Transfer Engine (Light Mode - CPU/GPU)
+tensorflow>=2.15.0
+tensorflow-hub>=0.15.0
+
+# Deep Generative Diffusion Engine (Pro Mode - CUDA / GPU Accelerated)
+# Note: For CUDA 12.1 support, install PyTorch wheels:
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+torch>=2.1.0
+torchvision>=0.16.0
+diffusers>=0.30.0
+transformers>=4.40.0
+accelerate>=0.30.0
+safetensors>=0.4.0
+peft>=0.10.0
+huggingface_hub>=0.23.0

@@ -1,60 +1,161 @@
+import os
+import sys
 import torch
 import cv2
 import numpy as np
+import traceback
 from PIL import Image
 from diffusers import StableDiffusionControlNetImg2ImgPipeline, ControlNetModel, LCMScheduler
-from transformers import pipeline
+from transformers import pipeline, AutoModelForDepthEstimation, AutoImageProcessor
 
-# --- GLOBAL MODEL CACHE (Hafıza Yönetimi) ---
+_LAST_ERROR = "Bilinmeyen Hata"
+
+# =====================================================================
+# [GUVENLIK VE DAGITIM GUNCELLEMESI]: Dinamik Yol ve Offline Cekirdek
+# Neden Eklendi: USB'den kurulumda uygulamanin internete baglanmadan,
+# disa bagimli olmadan (Air-Gapped) calisabilmesi icin.
+# =====================================================================
+def get_base_dir():
+    """ PyInstaller (.exe) veya normal Python scripti fark etmeksizin ana klasoru bulur. """
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    else:
+        return os.path.dirname(os.path.abspath(__file__))
+
+BASE_DIR = get_base_dir()
+MODELS_DIR = os.path.join(BASE_DIR, "models")
+
+def get_model_path(hub_id, local_folder_name):
+    """
+    Once yerel 'models' klasorune bakar. (Offline USB Kurulumu icin)
+    Bulamazsa HuggingFace Hub ID'sini dondurur. (Gelistirici ortami icin)
+    """
+    local_path = os.path.join(MODELS_DIR, local_folder_name)
+    if os.path.exists(local_path):
+        return local_path
+    return hub_id
+
+# --- GLOBAL MODEL CACHE (Hafiza Yonetimi) ---
 _PIPELINE = None
 _DEPTH_ESTIMATOR = None
 
 def get_depth_map(image_pil):
+    """
+    Neden Eklendi: Girdi görselinden uzaysal derinlik (Z-Axis) matrisi çıkarmak için.
+    MiDaS (Monocular Depth Estimation) modeli, 2 boyutlu piksellerden 3 boyutlu
+    hacimsel bir harita üreterek ControlNet'e mekansal yapı koşulu (Conditioning) sağlar.
+    """
     global _DEPTH_ESTIMATOR
     if _DEPTH_ESTIMATOR is None:
-        print("[SENTA V2]: MiDaS Derinlik Algısı (Depth Map) Motoru Yükleniyor...")
-        device_id = 0 if torch.cuda.is_available() else -1
-        _DEPTH_ESTIMATOR = pipeline('depth-estimation', model="Intel/dpt-hybrid-midas", device=device_id)
+        print("[SENTA V2]: MiDaS Derinlik Algisi (Depth Map) Motoru Yukleniyor...")
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        midas_path = get_model_path("Intel/dpt-hybrid-midas", "dpt-hybrid-midas")
+        
+        # [ZIRH]: Pipeline yerine manuel yükleme ile dosya formatı (bin/safetensors) kısıtlamasını aşıyoruz.
+        processor = AutoImageProcessor.from_pretrained(midas_path, local_files_only=True)
+        model = AutoModelForDepthEstimation.from_pretrained(midas_path, local_files_only=True).to(device)
+        _DEPTH_ESTIMATOR = {"model": model, "processor": processor, "device": device}
     
-    depth_image = _DEPTH_ESTIMATOR(image_pil)['depth']
-    return depth_image.convert("RGB")
+    inputs = _DEPTH_ESTIMATOR["processor"](images=image_pil, return_tensors="pt").to(_DEPTH_ESTIMATOR["device"])
+    with torch.no_grad():
+        outputs = _DEPTH_ESTIMATOR["model"](**inputs)
+        predicted_depth = outputs.predicted_depth
+        
+    prediction = torch.nn.functional.interpolate(
+        predicted_depth.unsqueeze(1),
+        size=image_pil.size[::-1],
+        mode="bicubic",
+        align_corners=False,
+    )
+    output = prediction.squeeze().cpu().numpy()
+    formatted = (output * 255 / np.max(output)).astype("uint8")
+    return Image.fromarray(formatted).convert("RGB")
 
 def get_diffusion_pipeline():
-    global _PIPELINE
+    global _PIPELINE, _LAST_ERROR
     if _PIPELINE is not None:
         return _PIPELINE
         
-    print("[SENTA V2]: Depth ControlNet ve LCM Turbo Yükleniyor (Sarsılmaz Sürüm)...")
+    print("[SENTA V2]: Depth ControlNet ve LCM Turbo Yukleniyor (Sarsilmaz Surum)...")
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     try:
+        cnet_path = get_model_path("lllyasviel/sd-controlnet-depth", "sd-controlnet-depth")
+        # [ZIRH]: local_files_only=True EKLENDI
         controlnet = ControlNetModel.from_pretrained(
-            "lllyasviel/sd-controlnet-depth", 
-            torch_dtype=torch.float16 if device == "cuda" else torch.float32
-        )
-        
-        pipe = StableDiffusionControlNetImg2ImgPipeline.from_pretrained(
-            "runwayml/stable-diffusion-v1-5", 
-            controlnet=controlnet, 
+            cnet_path, 
             torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-            safety_checker=None 
+            local_files_only=True,
+            use_safetensors=True  # [EXE ZIRHI]: Safetensors okumaya zorlar
         )
         
-        pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
+        sd_path = get_model_path("runwayml/stable-diffusion-v1-5", "stable-diffusion-v1-5")
+        
+        # =====================================================================
+        # [BAŞ MİMAR ZIRHI]: OTONOM ÇİFT-AŞAMALI YÜKLEYİCİ (DUAL-LOAD ARMOR)
+        # Terminal (.py) ve Kapsül (.exe) çatışmasını kökünden çözer.
+        # =====================================================================
+        try:
+            # Deneme 1: Terminal (Geliştirici) Ortamı İçin Standart Yükleme
+            pipe = StableDiffusionControlNetImg2ImgPipeline.from_pretrained(
+                sd_path, 
+                controlnet=controlnet, 
+                torch_dtype=torch.float16 if device == "cuda" else torch.float32,
+                safety_checker=None,
+                local_files_only=True,
+                use_safetensors=True
+            )
+        except Exception as e_term:
+            print(f"[SENTA V2]: Terminal modu reddedildi. EXE (FP16) uyumluluk moduna geciliyor...")
+            # Deneme 2: EXE Ortamında patlarsa, kilitleri kırıp FP16 varyantı ile zorla yükleme
+            pipe = StableDiffusionControlNetImg2ImgPipeline.from_pretrained(
+                sd_path, 
+                controlnet=controlnet, 
+                torch_dtype=torch.float16 if device == "cuda" else torch.float32,
+                safety_checker=None,
+                local_files_only=True,
+                use_safetensors=True,
+                variant="fp16"
+            )
+        # =====================================================================
+        
+        lcm_path = get_model_path("latent-consistency/lcm-lora-sdv1-5", "lcm-lora-sdv1-5")
+        # [ZIRH]: local_files_only=True EKLENDI
+        # [KİLİDİ KIRAN DÜZELTME]: Offline modda weight_name belirtmek zorunludur!
+        if os.path.isdir(lcm_path):
+            lora_files = [f for f in os.listdir(lcm_path) if f.endswith(('.safetensors', '.bin'))]
+            if lora_files:
+                pipe.load_lora_weights(lcm_path, weight_name=lora_files[0], local_files_only=True)
+            else:
+                raise FileNotFoundError(f"KRİTİK HATA: LCM klasörü boş: {lcm_path}")
+        else:
+            raise FileNotFoundError(f"KRİTİK HATA: LCM klasörü eksik!")
+
         pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
         
-        # [KRİTİK DÜZELTME]: CPU Offload ve Attention Slicing SİLİNDİ!
-        # Modeli direkt Ekran Kartının (VRAM) içine kalıcı olarak gömüyoruz. Hız %500 artacak.
+        # [KRITIK DUZELTME]: CPU Offload ve Attention Slicing SILINDI!
+        # Modeli direkt Ekran Kartinin (VRAM) icine kalici olarak gomuyoruz. Hiz %500 artacak.
         pipe.to(device)
         
         _PIPELINE = pipe
-        print(f"[SENTA V2]: LCM Turbo Motoru Başarıyla Ateşlendi ({device}). Sistem Hazır!")
+        print(f"[SENTA V2]: LCM Turbo Motoru Basariyla Ateslendi ({device}). Sistem Hazir!")
         return _PIPELINE
     except Exception as e:
-        print(f"[KRİTİK HATA]: Model yüklenemedi.\n{e}")
+        hata_detayi = traceback.format_exc()
+        try:
+            with open(os.path.join(BASE_DIR, "CRASH_LOG.txt"), "w", encoding="utf-8") as f:
+                f.write(hata_detayi)
+        except:
+            pass
+        _LAST_ERROR = str(e)
+        print(f"[KRITIK HATA]: Model yuklenemedi. Lutfen 'models' klasorundeki dosyalari kontrol et!\n{e}")
         return None
 
 def get_dominant_color_name(image_matrix):
+    """
+    Renk algisi motoru.
+    Gorselin HSV uzayindaki baskin tonunu metinsel bir karsiliga (prompt objesine) cevirir.
+    """
     hsv = cv2.cvtColor(image_matrix, cv2.COLOR_RGB2HSV)
     mask = hsv[:,:,2] > 20 
     if not np.any(mask): return "dark"
@@ -69,7 +170,10 @@ def get_dominant_color_name(image_matrix):
     else: return "colorful"
 
 def apply_adaptive_histogram_bending(image_matrix, loudness, user_intensity_slider):
-    if image_matrix is None: return None, "HATA: İşlenecek matris yok."
+    """
+    Sesin gurluk (RMS) degerini kullanarak gorselin isik kontrastini (Gamma Egrisi) buker.
+    """
+    if image_matrix is None: return None, "HATA: Islenecek matris yok."
     normalized_loudness = np.clip(loudness / 100.0, 0.5, 1.5)
     intensity = max(0.1, float(user_intensity_slider))
     gamma = 1.0 / (intensity * normalized_loudness)
@@ -85,9 +189,12 @@ def apply_adaptive_histogram_bending(image_matrix, loudness, user_intensity_slid
     merged_lab = cv2.merge((cl, a_channel, b_channel))
     final_image = cv2.cvtColor(merged_lab, cv2.COLOR_LAB2RGB)
 
-    return final_image, f"📉 Adaptif Histogram: γ = {gamma:.2f} | Müzik Çarpanı: {normalized_loudness:.2f}"
+    return final_image, f"Adaptif Histogram: y = {gamma:.2f} | Muzik Carpani: {normalized_loudness:.2f}"
 
 def transfer_color_profile(source_img, target_img):
+    """
+    Hedef sanat eserinin renk standart sapmasini, ana gorsele transfer eder.
+    """
     src_lab = cv2.cvtColor(source_img, cv2.COLOR_RGB2LAB).astype(np.float32)
     tgt_lab = cv2.cvtColor(target_img, cv2.COLOR_RGB2LAB).astype(np.float32)
     
@@ -104,8 +211,13 @@ def transfer_color_profile(source_img, target_img):
     return cv2.cvtColor(src_lab, cv2.COLOR_LAB2RGB)
 
 def synthesize_fusion_art(base_image, style_reference, is_music_mode=False, target_concept=None, style_name="Cubist", loudness=50.0, intensity_slider=1.0, style_weight=1.0):
+    """
+    Ana Sentez Motoru: Sinyal iskeletini ve stil matrisini difuzyon modeliyle kaynastirir.
+    VRAM tasmalarina (OOM) karsi koruma onlemleri icerir.
+    """
     pipe = get_diffusion_pipeline()
-    if pipe is None: return None, "HATA: Motor başlatılamadı."
+    if pipe is None: 
+        return None, f"HATA: Motor baslatilamadi.\nNEDENI: {_LAST_ERROR}\n(Detay icin CRASH_LOG.txt dosyasina bakin)"
 
     if isinstance(base_image, np.ndarray):
         if base_image.dtype != np.uint8:
@@ -115,8 +227,8 @@ def synthesize_fusion_art(base_image, style_reference, is_music_mode=False, targ
         base_pil = base_image.convert("RGB")
         base_image = np.array(base_pil)
 
-    # VRAM BOĞULMASINI ÖNLEYEN ÇÖZÜNÜRLÜK OPTİMİZATÖRÜ
-    max_dim = 768  # 768x768, LCM Turbo için ideal boyut. Daha büyükse optimize edilir.
+    # VRAM BOGULMASINI ONLEYEN COZUNURLUK OPTIMIZATORU
+    max_dim = 768  # 768x768, LCM Turbo icin ideal boyut. Daha buyukse optimize edilir.
     w, h = base_pil.size
     
     if max(w, h) > max_dim:
@@ -127,7 +239,7 @@ def synthesize_fusion_art(base_image, style_reference, is_music_mode=False, targ
         base_pil = base_pil.resize((new_w, new_h), Image.LANCZOS)
         base_image = np.array(base_pil)
         w, h = new_w, new_h
-        print(f"[SENTA HIZLANDIRICI]: Fotoğraf {w}x{h} boyutuna optimize edildi.")
+        print(f"[SENTA HIZLANDIRICI]: Fotograf {w}x{h} boyutuna optimize edildi.")
 
     if isinstance(style_reference, str):
         style_pil = base_pil
@@ -157,7 +269,7 @@ def synthesize_fusion_art(base_image, style_reference, is_music_mode=False, targ
         control_scale_val = 0.45 * (1.5 - style_weight)
         guidance_scale_val = 1.5 
         
-        if target_concept and target_concept.strip() != "":
+        if target_concept is not None and str(target_concept).strip() != "":
             positive_prompt = f"A clear, striking {target_concept} as the central focal point, highly detailed, photorealistic features, emerging from {dominant_color} abstract intersecting cubist planes, heavily textured with {short_style_name} art style, sharp edges, vibrant, aesthetic digital art, 8k resolution"
         else:
             positive_prompt = f"{dominant_color} themed abstract expressionist music visualization, heavily textured with {short_style_name} art style, masterpiece, highly detailed, vibrant, aesthetic digital art, 8k resolution, sharp geometric shapes"
@@ -194,32 +306,39 @@ def synthesize_fusion_art(base_image, style_reference, is_music_mode=False, targ
         raw_output_array = np.array(output)
         final_image, hist_log = apply_adaptive_histogram_bending(raw_output_array, loudness, intensity_slider)
 
-        return final_image, f"LCM Turbo + Depth + LAB Sentez Başarılı (Stil Yoğunluğu: %{int(style_weight*100)})\n{hist_log}"
+        return final_image, f"LCM Turbo + Depth + LAB Sentez Basarili (Stil Yogunlugu: %{int(style_weight*100)})\n{hist_log}"
     except Exception as e:
-        return None, f"DİFÜZYON MOTORU ÇÖKTÜ: {str(e)}"
+        hata_detayi = traceback.format_exc()
+        try:
+            with open(os.path.join(BASE_DIR, "CRASH_LOG.txt"), "w", encoding="utf-8") as f:
+                f.write(hata_detayi)
+        except:
+            pass
+        return None, f"DIFUZYON MOTORU COKTU: {str(e)}\nCRASH_LOG.txt dosyasini inceleyin!"
 
 # =====================================================================
-# [KRİTİK DÜZELTME]: GLOBAL WARM-UP (HATA KORUMALI)
+# [KRITIK DUZELTME]: GLOBAL WARM-UP (HATA KORUMALI)
+# Sistemin soguk baslatmadan (Cold Start) kaynakli kilitlenmesini onler.
 # =====================================================================
 def _warmup_engine():
-    print("\n" + "█"*60)
-    print("🚀 [SENTA V2]: MOTOR ISITMA PROTOKOLÜ BAŞLATILIYOR (WARM-UP)")
-    print("█"*60)
-    print("[SENTA V2]: 1/4 - MiDaS ve LCM Turbo Modelleri VRAM'e Çekiliyor...")
+    print("\n" + "="*60)
+    print("[SENTA V2]: MOTOR ISITMA PROTOKOLU BASLATILIYOR (WARM-UP)")
+    print("="*60)
+    print("[SENTA V2]: 1/4 - MiDaS ve LCM Turbo Modelleri VRAM'e Cekiliyor...")
     
     pipe = get_diffusion_pipeline()
     
     if pipe is not None:
-        print("[SENTA V2]: 2/4 - Sahte (Dummy) Matris Üretiliyor...")
+        print("[SENTA V2]: 2/4 - Sahte (Dummy) Matris Uretiliyor...")
         dummy_matrix = np.zeros((512, 512, 3), dtype=np.uint8)
         dummy_pil = Image.fromarray(dummy_matrix)
         
-        print("[SENTA V2]: 3/4 - MiDaS Derinlik Motoru Kör Ateşleme Yapıyor...")
+        print("[SENTA V2]: 3/4 - MiDaS Derinlik Motoru Kor Atesleme Yapiyor...")
         dummy_depth = get_depth_map(dummy_pil)
         
-        print("[SENTA V2]: 4/4 - LCM Turbo CUDA Çekirdekleri Isıtılıyor (Lütfen Bekleyin)...")
+        print("[SENTA V2]: 4/4 - LCM Turbo CUDA Cekirdekleri Isitiliyor (Lutfen Bekleyin)...")
         try:
-            # DÜZELTME: Tensör çöküşünü önlemek için negative_prompt ve 4 step eklendi.
+            # DUZELTME: Tensor cokusunu onlemek icin negative_prompt ve 4 step eklendi.
             _ = pipe(
                 prompt="a black square",
                 negative_prompt="nothing",
@@ -231,11 +350,11 @@ def _warmup_engine():
                 guidance_scale=1.5
             )
             print("-" * 60)
-            print("[SENTA V2]: ✅ WARM-UP TAMAMLANDI! Motorlar jilet gibi, rölantide bekliyor.")
-            print("█" * 60 + "\n")
+            print("[SENTA V2]: WARM-UP TAMAMLANDI! Motorlar jilet gibi, rolantide bekliyor.")
+            print("=" * 60 + "\n")
         except Exception as e:
-            print(f"[KRİTİK HATA]: Isıtma sırasında motor çöktü! Hata: {e}")
+            print(f"[KRITIK HATA]: Isitma sirasinda motor coktu! Hata: {e}")
     else:
-        print("[KRİTİK HATA]: Modeller yüklenemediği için ısıtma iptal edildi.")
+        print("[KRITIK HATA]: Modeller yuklenemedigi icin isitma iptal edildi.")
 
 _warmup_engine()
