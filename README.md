@@ -168,8 +168,12 @@ Sistem iki farklı veri boyutuyla tam uyumlu çalışmaktadır:
 
 - **Proje Türü:** Bilgisayar Programcılığı / Bitirme Tezi
 - **Geliştirici:** Ömer Faruk SAĞLAM
-- **Akademik Danışman & Katkıda Bulunanlar:** *[Danışman Bilgisi / Bölüm Başkanı İsmi - İzin doğrultusunda güncellenecektir]*
+- **Akademik Danışman:** Refik Tanju SİRMEN
+- **Katkıda Bulunan:** Deniz Tan SİRMEN
 - **Detaylı Sistem Analizi Raporu:** [docs/PROJE_RAPORU.md](docs/PROJE_RAPORU.md)
+
+### 🙏 Teşekkürler / Acknowledgements
+Bu çalışmanın araştırma, sistem analizi ve algoritmik geliştirme süreçlerindeki paha biçilmez rehberlikleri, akademik vizyonları ve destekleri için değerli danışmanım **Sayın Refik Tanju SİRMEN**'e ve projeye sunduğu katkılardan ötürü **Sayın Deniz Tan SİRMEN**'e en içten teşekkürlerimi ve saygılarımı sunarım.
 
 ---
 

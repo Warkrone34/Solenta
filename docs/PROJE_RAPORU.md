@@ -2,6 +2,8 @@
 ## Müzikal Determinantlar ve Akıllı Geometrik Sentez Yoluyla Görsel Sanat Üretim Laboratuvarı
 
 **Yazar:** Ömer Faruk SAĞLAM  
+**Akademik Danışman:** Refik Tanju SİRMEN  
+**Katkıda Bulunan:** Deniz Tan SİRMEN  
 **Proje:** Tez Final ve Sistem Analizi Raporu   
 **Program:** DMYO, Bilgisayar Programcılığı  
 
@@ -14,6 +16,11 @@ Bu proje, müziğin işitsel ve dinamik yapısını, yapay zekâ ve hesaplamalı
 Proje kapsamında, kullanıcının yüklediği şarkının en yüksek enerjili kesitini bulan "Akıllı Kesim" (Smart Crop) algoritması geliştirilmiş, görselin yapısal iskeleti Akustik Voronoi Şeması ile oluşturulmuş ve sinyal verileri Nöral Stil Transferi (NST) ve LCM Turbo difüzyon motorları ile işlenmiştir [2, 3]. Yerel (Local) GPU üzerinde çalışan sistem, 1080p kalitesindeki çıktıları Lanczos-4 süper çözünürlük algoritmaları ve K-Means filtreleri ile 1 dakikanın altında üretebilecek kapasiteye getirilmiştir. Proje, dijital sanatta makine-insan ko-yaratımı için yenilikçi bir çerçeve sunmaktadır [8].
 
 **Anahtar Kelimeler:** Sinestetik Yapay Zekâ, Dijital Sinyal İşleme, Akustik Voronoi, Nöral Stil Transferi, LCM Turbo, Akıllı Kesim.
+
+---
+
+### TEŞEKKÜR
+Bu tezin araştırma, sistem analizi ve algoritmik geliştirme süreçlerindeki paha biçilmez rehberlikleri, akademik vizyonları ve destekleri için değerli akademik danışmanım **Sayın Refik Tanju SİRMEN**'e ve projeye sunduğu kıymetli katkılardan ötürü **Sayın Deniz Tan SİRMEN**'e en içten teşekkürlerimi ve saygılarımı sunarım.
 
 ---
 
