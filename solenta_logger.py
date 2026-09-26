@@ -22,7 +22,7 @@ def get_base_dir():
         return os.path.dirname(os.path.abspath(__file__))
 
 BASE_DIR = get_base_dir()
-TRAINING_DATA_DIR = os.path.join(BASE_DIR, "senta_export_logs")
+TRAINING_DATA_DIR = os.path.join(BASE_DIR, "solenta_export_logs")
 
 # I/O İşlemleri için dizin ağacının asenkron olmayan, güvenli inşası
 # Dizin yoksa FileNotFoundError çökmesini önlemek için hiyerarşik olarak üretilir.
@@ -34,7 +34,7 @@ if not os.path.exists(TRAINING_DATA_DIR):
 def log_training_data(final_image, state_data, target_concept, intensity_val, spatial_val, kmeans_val):
     """
     [VERİ GÖLÜ (DATA LAKE) YÖNETİMİ VE ETL PROTOKOLÜ]
-    Neden Eklendi: SENTA'nın ürettiği her başarılı çıktıyı deterministik parametreleriyle 
+    Neden Eklendi: SOLENTA'nın ürettiği her başarılı çıktıyı deterministik parametreleriyle 
     (BPM, Timbre, Slider verileri) eşleştirerek gelecekteki Fine-Tuning (İnce Ayar) ve 
     Gözetimli Öğrenme (Supervised Learning) süreçleri için yapılandırılmamış bir 
     veri ambarı (Data Lake) oluşturur.
@@ -56,7 +56,7 @@ def log_training_data(final_image, state_data, target_concept, intensity_val, sp
         # Zaman damgası ve UUIDv4 birleştirilerek astronomik çarpışma direnci (Collision Resistance) sağlanır.
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         unique_id = str(uuid.uuid4().hex)[:8]
-        safe_filename = f"senta_{timestamp}_{unique_id}"
+        safe_filename = f"solenta_{timestamp}_{unique_id}"
 
         image_path = os.path.join(TRAINING_DATA_DIR, "images", f"{safe_filename}.jpg")
         json_path = os.path.join(TRAINING_DATA_DIR, "metadata", f"{safe_filename}.json")
@@ -64,7 +64,7 @@ def log_training_data(final_image, state_data, target_concept, intensity_val, sp
         # =====================================================================
         # 3. Renk Uzayı Dönüşümü ve Matris İhracı
         # =====================================================================
-        # Neden Eklendi: SENTA iç mimaride algısal doğruluk için RGB çalışırken,
+        # Neden Eklendi: SOLENTA iç mimaride algısal doğruluk için RGB çalışırken,
         # OpenCV'nin disk yazma motoru (imwrite) donanımsal olarak BGR dizilimi bekler.
         # Renk spektrumunun tersine dönmesini engellemek için kanal yer değişimi yapılır.
         bgr_image = cv2.cvtColor(final_image, cv2.COLOR_RGB2BGR)

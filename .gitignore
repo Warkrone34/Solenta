@@ -1,5 +1,5 @@
 # =====================================================================
-# SENTA - Git Ignore Configuration
+# SOLENTA - Git Ignore Configuration
 # =====================================================================
 
 # Python bytecode & cache
@@ -27,6 +27,7 @@ _internal/
 # Note: Models are automatically fetched from Hugging Face Hub / TF Hub
 models/
 senta_ai_models/
+solenta_ai_models/
 *.safetensors
 *.bin
 *.pt
@@ -38,7 +39,9 @@ senta_ai_models/
 # Generated logs, crash reports, and local data lake
 CRASH_LOG.txt
 senta_export_logs/
+solenta_export_logs/
 senta_training_dataset/
+solenta_training_dataset/
 *.log
 
 # Large Image Datasets (Exclude full 900MB+ dataset, keep sample art for demo)

@@ -55,7 +55,7 @@ def find_optimal_audio_segment(audio_path, window_duration=10.0):
         onset_norm = librosa.util.normalize(onset_env)
         
         # 3. NİHAİ SKOR: İki metriğin matrisel toplamı ile genel aktivite yoğunluğunu bulur.
-        senta_score = rms_norm + onset_norm
+        solenta_score = rms_norm + onset_norm
         
         # 4. KAYAN PENCERE (Rolling Window) ALGORİTMASI
         # Tarama çerçevesinin adım uzunluğunu ve saniye başına düşen kare (frame) sayısını belirler.
@@ -66,7 +66,7 @@ def find_optimal_audio_segment(audio_path, window_duration=10.0):
         # Sinyalin tamamını belirlediğimiz saniye (window) genişliğindeki bir filtreyle tarayarak
         # her bir olasılık için toplam enerji skorunu konvolüsyon (convolution) işlemi ile çıkarır.
         window = np.ones(window_frames)
-        rolling_sum = np.convolve(senta_score, window, mode='valid')
+        rolling_sum = np.convolve(solenta_score, window, mode='valid')
         
         # Kayan pencerenin en yüksek skoru (maksimum aktivite) bulduğu indeks numarasını çeker.
         best_frame_idx = np.argmax(rolling_sum)
@@ -79,7 +79,7 @@ def find_optimal_audio_segment(audio_path, window_duration=10.0):
         if best_time_sec + window_duration > audio_duration:
             best_time_sec = max(0.0, audio_duration - window_duration)
             
-        print(f"SENTA ANALIZ: Otonom segmentasyon tamamlandi. Maksimum enerji {round(best_time_sec, 2)}. saniyede saptandi.")
+        print(f"SOLENTA ANALIZ: Otonom segmentasyon tamamlandi. Maksimum enerji {round(best_time_sec, 2)}. saniyede saptandi.")
         return round(best_time_sec, 2)
         
     except Exception as e:
@@ -161,7 +161,7 @@ def analyze_audio_determinants(audio_path, start_time=0.0, duration=10.0):
         loudness = float(np.mean(rms[valid_rms])) if valid_rms else float(np.mean(rms))
         normalized_loudness = min(max(int((loudness / 0.3) * 150), 20), 150)
         
-        # Yapay zekaya (SENTA) yön verecek olan dört fiziksel sabiti çıktı olarak döner.
+        # Yapay zekaya (SOLENTA) yön verecek olan dört fiziksel sabiti çıktı olarak döner.
         return round(bpm, 2), round(timbre_centroid, 2), hue_value, normalized_loudness
     
     except Exception as e:
@@ -175,7 +175,7 @@ if __name__ == "__main__":
     import os
     test_file = "test_sarkisi.mp3" 
     
-    print(f"SENTA AUDIO MOTORU (ONSET TABANLI) KONTROL PROTOKOLÜ")
+    print(f"SOLENTA AUDIO MOTORU (ONSET TABANLI) KONTROL PROTOKOLÜ")
     if os.path.exists(test_file):
         print("\nAdım 1: Heuristik Enerji Kestirimi (Smart Crop) yürütülüyor...")
         en_iyi_saniye = find_optimal_audio_segment(test_file)

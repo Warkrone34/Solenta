@@ -1,4 +1,4 @@
-# SENTA: Synesthetic Generative Laboratory
+# SOLENTA: Synesthetic Generative Laboratory
 ### *İşitsel-Görsel Sinestezi ve Üretken Sanat Laboratuvarı*
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
@@ -7,14 +7,14 @@
 [![Gradio](https://img.shields.io/badge/UI-Gradio%20Blocks-orange.svg?logo=gradio&logoColor=white)](https://gradio.app/)
 [![OpenCV](https://img.shields.io/badge/OpenCV-4.11-5C3EE8.svg?logo=opencv&logoColor=white)](https://opencv.org/)
 [![Librosa](https://img.shields.io/badge/Audio-Librosa%20DSP-yellow.svg)](https://librosa.org/)
-[![Academic Thesis](https://img.shields.io/badge/Degree-Thesis%20(BA%20Grade)-success.svg)](https://github.com/Warkrone34/SENTA)
+[![Academic Thesis](https://img.shields.io/badge/Degree-Thesis%20(BA%20Grade)-success.svg)](https://github.com/Warkrone34/Solenta)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
 
 ## 📌 Abstract / Proje Özeti
 
-**SENTA (Synesthetic Generative Laboratory)**, işitsel sinyalleri (müzik ve ses frekansları) plastik sanat eserleriyle (özellikle Kübist akım) ve yapay görme algoritmalarıyla birleştiren, çok disiplinli (**Multidisciplinary**) bir görüntü işleme ve üretken yapay zeka (**Generative AI**) tez projesidir.
+**SOLENTA (Synesthetic Generative Laboratory)**, işitsel sinyalleri (müzik ve ses frekansları) plastik sanat eserleriyle (özellikle Kübist akım) ve yapay görme algoritmalarıyla birleştiren, çok disiplinli (**Multidisciplinary**) bir görüntü işleme ve üretken yapay zeka (**Generative AI**) tez projesidir.
 
 Proje, yalnızca hazır bir difüzyon sarmalayıcısı (wrapper) olmak yerine; **dijital sinyal işleme (DSP)**, **geometrik hesaplamalı topoloji (Voronoi şeması)**, **renk kuramı ve Gestalt algısı (Eşzamanlı Kontrast, K-Means++)** ve **çift motorlu nöral sentez (Neural Style Transfer + ControlNet Depth-to-Image with LCM Turbo)** aşamalarını birbirine bağlayan uçtan uca açıklanabilir (**Explainable / White-Box**) bir bilişsel mimari sunar.
 
@@ -25,7 +25,7 @@ Proje, yalnızca hazır bir difüzyon sarmalayıcısı (wrapper) olmak yerine; *
 
 ## 🏗️ System Architecture / Mimari İş Akışı
 
-Aşağıdaki şema, ham bir ses dosyasının veya kullanıcı görselinin SENTA boru hattından geçerek 1080p nihai sanatsal çıktıya dönüşüm serüvenini göstermektedir:
+Aşağıdaki şema, ham bir ses dosyasının veya kullanıcı görselinin SOLENTA boru hattından geçerek 1080p nihai sanatsal çıktıya dönüşüm serüvenini göstermektedir:
 
 ```mermaid
 flowchart TD
@@ -43,14 +43,14 @@ flowchart TD
 
     subgraph Dual_Engine ["3. Çift Motorlu Nöral Sentez (Dual-Engine)"]
         G --> H{"Sentez Modu Seçimi"}
-        H -->|"Light Mod (CPU/GPU)"| I["Arbitrary NST (TensorFlow Hub / VGG-19)\n• Spatial Content & Low-level Style Fusion\n• SENTA Signature Enhancement (Luminance & CLAHE)"]
+        H -->|"Light Mod (CPU/GPU)"| I["Arbitrary NST (TensorFlow Hub / VGG-19)\n• Spatial Content & Low-level Style Fusion\n• SOLENTA Signature Enhancement (Luminance & CLAHE)"]
         H -->|"Pro Mod (CUDA)"| J["MiDaS Monocular Depth Estimation\n+ ControlNet Depth Conditioning\n+ SD 1.5 with LCM-LoRA (4-Step Turbo)"]
     end
 
     subgraph Post_Processing ["4. Canlı Sinyal-Piksel Modifikasyonu & Veri Gölü"]
         I & J --> K["Canlı Filtreler:\n• Tınıya Dayalı Dinamik Konvolüsyon (Laplacian Unsharp)\n• Adaptif Histogram Bükülmesi (Gamma & CLAHE)\n• Vektörel Renk Kuantizasyonu (K-Means++)"]
         K --> L["Lanczos-4 Süper Çözünürlük (1080p Crisp Output)"]
-        L --> M["ETL & Veri Ambarı (senta_logger)\nNoSQL/JSON Parametre Kaydı & Fine-Tuning Veri Gölü"]
+        L --> M["ETL & Veri Ambarı (solenta_logger)\nNoSQL/JSON Parametre Kaydı & Fine-Tuning Veri Gölü"]
     end
 ```
 
@@ -72,7 +72,7 @@ flowchart TD
 - **2D Fourier Görsel Tınısı:** Eserlerin dokusal frekans genliği $\mathcal{F}_{2D}$ dönüşümü ile hesaplanarak müzikal tını ile eşleştirilir.
 
 ### 4. Çift Motorlu Hibrit Yapay Zeka (`nst_engine.py` & `diffusion_engine.py`)
-- **Light Mod (Mobil/Hafif Sistemler):** Google Magenta Arbitrary Image Stylization modeli üzerinden ileri besleme (Feed-Forward). NST modellerindeki renk solmasını (Color Shift) önlemek adına LAB renk uzayında Luminance korumalı **SENTA Signature Enhancement** rötüşü uygulanır.
+- **Light Mod (Mobil/Hafif Sistemler):** Google Magenta Arbitrary Image Stylization modeli üzerinden ileri besleme (Feed-Forward). NST modellerindeki renk solmasını (Color Shift) önlemek adına LAB renk uzayında Luminance korumalı **SOLENTA Signature Enhancement** rötüşü uygulanır.
 - **Pro Mod (Yüksek Başarımlı CUDA):** Intel MiDaS ile derinlik haritası (Z-Axis Depth Map) çıkarılır. Stable Diffusion 1.5, ControlNet Depth koşullandırması ve Latent Consistency Model (LCM) LoRA çekirdeği ile 4-6 adımda fotogerçekçi sentez üretir.
 
 ---
@@ -80,7 +80,7 @@ flowchart TD
 ## 📂 Repository Structure / Dizin Yapısı
 
 ```
-SENTA/
+Solenta/
 ├── app.py                   # Gradio tabanlı ana orkestrasyon ve arayüz katmanı
 ├── audio_engine.py          # Librosa tabanlı DSP, STFT, FFT, Smart Crop motoru
 ├── color_engine.py          # K-Means++ ve Eşzamanlı Kontrast renk analiz motoru
@@ -88,7 +88,7 @@ SENTA/
 ├── diffusion_engine.py      # MiDaS Depth + ControlNet + LCM Turbo Pro motoru
 ├── filter_engine.py         # Laplacian dinamik konvolüsyon & K-Means kuantizasyon
 ├── nst_engine.py            # Magenta NST (VGG-19) & LAB renk restorasyonu
-├── senta_logger.py          # Deterministik JSON ETL / Data Lake loglama motoru
+├── solenta_logger.py        # Deterministik JSON ETL / Data Lake loglama motoru
 ├── requirements.txt         # Standart ve temiz bağımlılık listesi (UTF-8)
 ├── LICENSE                  # MIT Açık Kaynak Lisansı
 ├── .gitignore               # Model, venv, build ve 100MB+ dosyaları süzen filtre
@@ -113,8 +113,8 @@ SENTA/
 ### 2. Klonlama ve Sanal Ortam Kurulumu
 ```bash
 # Depoyu klonlayın
-git clone https://github.com/Warkrone34/SENTA.git
-cd SENTA
+git clone https://github.com/Warkrone34/Solenta.git
+cd Solenta
 
 # Sanal ortam oluşturup aktive edin
 python -m venv venv

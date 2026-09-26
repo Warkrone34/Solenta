@@ -73,7 +73,7 @@ from audio_engine import analyze_audio_determinants, find_optimal_audio_segment
 from color_engine import analyze_color_context
 from nst_engine import synthesize_nst_art, apply_adaptive_histogram_bending
 from filter_engine import apply_timbre_driven_convolution, apply_kmeans_color_quantization 
-from senta_logger import log_training_data
+from solenta_logger import log_training_data
 from data_manager import (
     get_all_artists,
     get_artworks_by_artist,
@@ -208,7 +208,7 @@ def generate_detailed_log(bpm, timbre, hue_val, loudness, akim_karari, style_nam
     ve log kayitlarina dogrudan seffaf (white-box) sekilde gostermek amaciyla olusturulmustur.
     """
     # AI tarafından alınan analitik kararların arayüzde okunabilir bir string (metin) raporuna dönüştürülmesi işlemini yapar.
-    log_text = f"SENTA URETIM SURECI ANALIZI\n\n"
+    log_text = f"SOLENTA URETIM SURECI ANALIZI\n\n"
     log_text += f"1. ISITSEL-GORSEL HARITALAMA (DETERMINANTLAR)\n"
     log_text += f"|- Ritim (BPM)    : {bpm:.1f} (Voronoi tohum noktalarinin sayisini belirledi)\n"
     log_text += f"|- Tini (Timbre)  : {timbre:.1f} Hz (Dinamik Konvolusyon Matrisi carpani)\n"
@@ -572,7 +572,7 @@ def process_image_to_image(content_image, is_auto, artist, artwork, top_10_state
             engine_used = "Neural Style Transfer Modulu"
 
         # Arayüze basılacak analiz raporunu (log) hazırlar.
-        log_text = f"SENTA GORSEL SENTEZ RAPORU\n\n"
+        log_text = f"SOLENTA GORSEL SENTEZ RAPORU\n\n"
         log_text += f"1. GORSEL ALGI\n|- Isik (Luminance): {user_lum:.2f}\n|- Kenar (Edge): {user_edge:.2f}\n|- Zemin: {zemin_rengi}\n\n"
         log_text += f"2. REFERANS\n|- Karar Mekanizmasi: {secim_yontemi}\n|- Eser: {style_name}\n\n"
         log_text += f"3. SENTEZ\n|- Cikti Cozunurlugu: 1080p (Lanczos-4)\n|- Motor : {engine_used}\n|- Agirlik: %{int(style_weight * 100)}\n|- Durum: {status}"
@@ -627,8 +627,8 @@ footer { display: none !important; visibility: hidden !important; opacity: 0 !im
 """
 
 # Arayüz inşa iskeletini (Blocks) başlatır.
-with gr.Blocks(css=custom_css, title="SENTA Laboratuvari") as senta_app:
-    gr.Markdown("# SENTA PROJE LABORATUVARI")
+with gr.Blocks(css=custom_css, title="Solenta Laboratuvari") as solenta_app:
+    gr.Markdown("# SOLENTA PROJE LABORATUVARI")
     gr.Markdown("<br>")
 
     # Ana sekmeleri (Tabs) oluşturur.
@@ -774,7 +774,7 @@ with gr.Blocks(css=custom_css, title="SENTA Laboratuvari") as senta_app:
 # Ana Calistirma Blogu (Entry Point)
 if __name__ == "__main__":
     # Gradio web sunucusunu yerel (127.0.0.1) agda ve 7860 portunda baslatir.
-    senta_app.launch(
+    solenta_app.launch(
         inbrowser=True, # Sunucu calistiginda varsayilan tarayiciyi otomatik olarak acar.
         server_name="127.0.0.1", 
         server_port=7860,

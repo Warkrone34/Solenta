@@ -44,7 +44,8 @@ if gpus:
 # =====================================================================
 # [KRİTİK ZIRH]: Göreceli yol yerine mutlak yol (Absolute Path) kullanıldı!
 # Kısayoldan çalıştırmalarda modelin Masaüstünde aranmasını engeller.
-os.environ["TFHUB_CACHE_DIR"] = os.path.join(BASE_DIR, "senta_ai_models")
+cache_dir = os.path.join(BASE_DIR, "solenta_ai_models") if os.path.exists(os.path.join(BASE_DIR, "solenta_ai_models")) else os.path.join(BASE_DIR, "senta_ai_models")
+os.environ["TFHUB_CACHE_DIR"] = cache_dir
 
 try:
     # Arbitrary Image Stylization ağının VRAM'e kalıcı olarak yüklenmesi.
@@ -103,7 +104,7 @@ def tensor_to_image(tensor):
         tensor = tensor[0]
     return tensor
 
-def apply_senta_signature_enhancement(raw_stylized_image, original_content_image):
+def apply_solenta_signature_enhancement(raw_stylized_image, original_content_image):
     """
     Neden Eklendi: NST modeli fırça darbelerini mükemmel aktarır ancak orijinal renklerin
     solmasına (Color Shift) neden olur. Bu modül, orijinal fotoğrafın Luminance (Işık) 
@@ -184,10 +185,10 @@ def synthesize_nst_art(content_image, style_image, style_weight=1.0):
         blended_tensor = (content_tensor * (1.0 - style_weight)) + (stylized_tensor * style_weight)
         raw_stylized_image = tensor_to_image(blended_tensor)
 
-        # 4. Yeniden Ölçeklendirme ve SENTA Rötüşü
+        # 4. Yeniden Ölçeklendirme ve SOLENTA Rötüşü
         h, w = content_image.shape[:2]
         resized_raw_image = cv2.resize(raw_stylized_image, (w, h), interpolation=cv2.INTER_CUBIC)
-        final_image = apply_senta_signature_enhancement(resized_raw_image, content_image)
+        final_image = apply_solenta_signature_enhancement(resized_raw_image, content_image)
 
         # 5. FIFO (First-In-First-Out) prensibiyle önbellek temizliği ve kayıt
         if len(SENTEZ_CACHE) >= MAX_CACHE_SIZE:

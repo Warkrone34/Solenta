@@ -1,5 +1,5 @@
 # =====================================================================
-# SENTA - Project Requirements & Dependencies
+# SOLENTA - Project Requirements & Dependencies
 # =====================================================================
 
 # Web Interface

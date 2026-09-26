@@ -47,7 +47,7 @@ def get_depth_map(image_pil):
     """
     global _DEPTH_ESTIMATOR
     if _DEPTH_ESTIMATOR is None:
-        print("[SENTA V2]: MiDaS Derinlik Algisi (Depth Map) Motoru Yukleniyor...")
+        print("[SOLENTA V2]: MiDaS Derinlik Algisi (Depth Map) Motoru Yukleniyor...")
         device = "cuda" if torch.cuda.is_available() else "cpu"
         midas_path = get_model_path("Intel/dpt-hybrid-midas", "dpt-hybrid-midas")
         
@@ -76,7 +76,7 @@ def get_diffusion_pipeline():
     if _PIPELINE is not None:
         return _PIPELINE
         
-    print("[SENTA V2]: Depth ControlNet ve LCM Turbo Yukleniyor (Sarsilmaz Surum)...")
+    print("[SOLENTA V2]: Depth ControlNet ve LCM Turbo Yukleniyor (Sarsilmaz Surum)...")
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     try:
@@ -106,7 +106,7 @@ def get_diffusion_pipeline():
                 use_safetensors=True
             )
         except Exception as e_term:
-            print(f"[SENTA V2]: Terminal modu reddedildi. EXE (FP16) uyumluluk moduna geciliyor...")
+            print(f"[SOLENTA V2]: Terminal modu reddedildi. EXE (FP16) uyumluluk moduna geciliyor...")
             # Deneme 2: EXE Ortamında patlarsa, kilitleri kırıp FP16 varyantı ile zorla yükleme
             pipe = StableDiffusionControlNetImg2ImgPipeline.from_pretrained(
                 sd_path, 
@@ -138,7 +138,7 @@ def get_diffusion_pipeline():
         pipe.to(device)
         
         _PIPELINE = pipe
-        print(f"[SENTA V2]: LCM Turbo Motoru Basariyla Ateslendi ({device}). Sistem Hazir!")
+        print(f"[SOLENTA V2]: LCM Turbo Motoru Basariyla Ateslendi ({device}). Sistem Hazir!")
         return _PIPELINE
     except Exception as e:
         hata_detayi = traceback.format_exc()
@@ -239,7 +239,7 @@ def synthesize_fusion_art(base_image, style_reference, is_music_mode=False, targ
         base_pil = base_pil.resize((new_w, new_h), Image.LANCZOS)
         base_image = np.array(base_pil)
         w, h = new_w, new_h
-        print(f"[SENTA HIZLANDIRICI]: Fotograf {w}x{h} boyutuna optimize edildi.")
+        print(f"[SOLENTA HIZLANDIRICI]: Fotograf {w}x{h} boyutuna optimize edildi.")
 
     if isinstance(style_reference, str):
         style_pil = base_pil
@@ -322,21 +322,21 @@ def synthesize_fusion_art(base_image, style_reference, is_music_mode=False, targ
 # =====================================================================
 def _warmup_engine():
     print("\n" + "="*60)
-    print("[SENTA V2]: MOTOR ISITMA PROTOKOLU BASLATILIYOR (WARM-UP)")
+    print("[SOLENTA V2]: MOTOR ISITMA PROTOKOLU BASLATILIYOR (WARM-UP)")
     print("="*60)
-    print("[SENTA V2]: 1/4 - MiDaS ve LCM Turbo Modelleri VRAM'e Cekiliyor...")
+    print("[SOLENTA V2]: 1/4 - MiDaS ve LCM Turbo Modelleri VRAM'e Cekiliyor...")
     
     pipe = get_diffusion_pipeline()
     
     if pipe is not None:
-        print("[SENTA V2]: 2/4 - Sahte (Dummy) Matris Uretiliyor...")
+        print("[SOLENTA V2]: 2/4 - Sahte (Dummy) Matris Uretiliyor...")
         dummy_matrix = np.zeros((512, 512, 3), dtype=np.uint8)
         dummy_pil = Image.fromarray(dummy_matrix)
         
-        print("[SENTA V2]: 3/4 - MiDaS Derinlik Motoru Kor Atesleme Yapiyor...")
+        print("[SOLENTA V2]: 3/4 - MiDaS Derinlik Motoru Kor Atesleme Yapiyor...")
         dummy_depth = get_depth_map(dummy_pil)
         
-        print("[SENTA V2]: 4/4 - LCM Turbo CUDA Cekirdekleri Isitiliyor (Lutfen Bekleyin)...")
+        print("[SOLENTA V2]: 4/4 - LCM Turbo CUDA Cekirdekleri Isitiliyor (Lutfen Bekleyin)...")
         try:
             # DUZELTME: Tensor cokusunu onlemek icin negative_prompt ve 4 step eklendi.
             _ = pipe(
@@ -350,7 +350,7 @@ def _warmup_engine():
                 guidance_scale=1.5
             )
             print("-" * 60)
-            print("[SENTA V2]: WARM-UP TAMAMLANDI! Motorlar jilet gibi, rolantide bekliyor.")
+            print("[SOLENTA V2]: WARM-UP TAMAMLANDI! Motorlar jilet gibi, rolantide bekliyor.")
             print("=" * 60 + "\n")
         except Exception as e:
             print(f"[KRITIK HATA]: Isitma sirasinda motor coktu! Hata: {e}")
